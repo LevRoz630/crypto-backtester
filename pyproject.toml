@@ -34,15 +34,12 @@ dependencies = [
     "aiohttp>=3.12.15",
     "ccxt>=4.5.4",
     "fastparquet>=2024.11.0",
-    "jupyter>=1.1.1",
-    "matplotlib>=3.10.6",
     "numpy>=2.3.3",
     "pandas>=2.3.2",
     "plotly>=6.3.1",
     "pyarrow>=21.0.0",
     "python-dotenv>=1.1.1",
     "requests>=2.32.5",
-    "scikit-learn>=1.7.2",
 ]
 
 [project.optional-dependencies]
@@ -52,11 +49,17 @@ docs = [
     "mkdocstrings[python]>=0.24.0",
 ]
 
+dev = [
+    "jupyter>=1.1.1",
+    "matplotlib>=3.10.6",
+    "scikit-learn>=1.7.2",
+]
+
 [project.urls]
-Homepage = "https://github.com/yourusername/crypto-backtester-binance"
-Documentation = "https://github.com/yourusername/crypto-backtester-binance#readme"
-Repository = "https://github.com/yourusername/crypto-backtester-binance"
-Issues = "https://github.com/yourusername/crypto-backtester-binance/issues"
+Homepage = "https://github.com/LevRoz630/crypto-backtester-binance"
+Documentation = "https://github.com/LevRoz630/crypto-backtester-binance#readme"
+Repository = "https://github.com/LevRoz630/crypto-backtester-binance"
+Issues = "https://github.com/LevRoz630/crypto-backtester-binance/issues"
 
 [build-system]
 requires = ["hatchling"]
