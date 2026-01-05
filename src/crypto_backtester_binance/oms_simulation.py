@@ -31,7 +31,7 @@ class OMSClient:
     def __init__(self, historical_data_dir: str = "../hku-data/test_data"):
         self.historical_data_dir = Path(historical_data_dir)
         self.positions = {}  # Open Positions for Perpetuals: {symbol: {quantity, value, side, entry_price, pnl}}
-        self.balance = 10000.0  # Balance for trading
+        self.balance = {"USDT": 10000.0}  # Balance for trading
         self.trade_history = []  # All trades executed
         self.current_time = None  # Current backtest time
         self.data_manager = None  # Will be set by backtester
@@ -55,7 +55,7 @@ class OMSClient:
         """Return current non-zero positions with live valuation and PnL."""
         positions = []
         for symbol, pos in self.positions.items():
-            instrument_type = 'future' if symbol.endswith('-PERP') else 'spot'
+            instrument_type = pos.get('instrument_type', 'future' if symbol.endswith('-PERP') else 'spot')
 
             if abs(pos['quantity']) > 0:
                 # Calculate current value and PnL
@@ -104,8 +104,9 @@ class OMSClient:
 
         # Interpret incoming target_value as an amount of USDT to deploy
         trade_value = float(trade_amount_usdt)
-        if trade_value > self.balance:
-            raise ValueError(f"Insufficient USDT balance. Required: {trade_value}, Available: {self.balance}")
+        usdt_balance = float(self.balance.get('USDT', 10000.0))
+        if trade_value > usdt_balance:
+            raise ValueError(f"Insufficient USDT balance. Required: {trade_value}, Available: {usdt_balance}")
 
         # Convert USDT → base-asset quantity at current mark/index price
         trade_qty = trade_value / current_price
@@ -128,7 +129,7 @@ class OMSClient:
         if position_side == 'CLOSE':
             # Explicit close: realize PnL and zero out the position
             pnl, principal = self.close_position(symbol, instrument_type)
-            self.balance += (pnl or 0.0) + (principal or 0.0)
+            self.balance['USDT'] = self.balance.get('USDT', 10000.0) + (pnl or 0.0) + (principal or 0.0)
             pos['pnl'] = pos.get('pnl', 0.0) + (pnl or 0.0)
             self.positions[symbol] = {
                 'quantity': 0.0,
@@ -141,7 +142,7 @@ class OMSClient:
 
         elif position_side == current_side:
             # Add to an existing position on the same side, update VWAP entry_price
-            self.balance -= trade_value
+            self.balance['USDT'] = self.balance.get('USDT', 10000.0) - trade_value
             new_qty = current_quantity + trade_qty
             self.positions[symbol] = {
                 'quantity': new_qty,
@@ -157,8 +158,8 @@ class OMSClient:
         elif position_side != current_side:
             # Flip side: realize PnL on the old side, then open a fresh position
             pnl, principal = self.close_position(symbol, instrument_type)
-            self.balance += (pnl or 0.0) + (principal or 0.0)
-            self.balance -= trade_value
+            self.balance['USDT'] = self.balance.get('USDT', 10000.0) + (pnl or 0.0) + (principal or 0.0)
+            self.balance['USDT'] -= trade_value
             self.positions[symbol] = {
                 'quantity': trade_qty,
                 'value': abs(trade_qty) * current_price,
@@ -226,7 +227,7 @@ class OMSClient:
         Update and return total portfolio value including balances and appropriate position valuation.
         
         """
-        total_value = self.balance
+        total_value = float(self.balance.get('USDT', 10000.0))
 
         for symbol, pos in self.positions.items():
             instrument_type = pos.get('instrument_type', 'future' if symbol.endswith('-PERP') else 'spot')
