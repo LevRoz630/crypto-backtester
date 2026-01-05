@@ -38,6 +38,8 @@ dependencies = [
     "pandas>=2.3.2",
     "plotly>=6.3.1",
     "pyarrow>=21.0.0",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
     "python-dotenv>=1.1.1",
     "requests>=2.32.5",
 ]
@@ -55,6 +57,13 @@ dev = [
     "scikit-learn>=1.7.2",
 ]
 
+test = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "pytest-asyncio>=0.23.0",
+]
+
 [project.urls]
 Homepage = "https://github.com/LevRoz630/crypto-backtester-binance"
 Documentation = "https://github.com/LevRoz630/crypto-backtester-binance#readme"
@@ -67,3 +76,21 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/crypto_backtester_binance"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--verbose",
+    "--strict-markers",
+    "--cov=crypto_backtester_binance",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "slow: Slow running tests",
+]

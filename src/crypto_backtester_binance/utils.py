@@ -43,6 +43,8 @@ def _normalize_symbol_pair(symbol: str) -> str | None:
         - "BTC/USDT" -> "BTC/USDT" (unchanged)
     """
     try:
+        if symbol is None:
+            return None
         s = str(symbol).strip()
         if not s:
             return None
