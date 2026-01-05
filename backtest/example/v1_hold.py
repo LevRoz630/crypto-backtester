@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Any
-from oms_simulation import OMSClient
-from hist_data import HistoricalDataCollector
+from crypto_backtester_binance.oms_simulation import OMSClient
+from crypto_backtester_binance.hist_data import HistoricalDataCollector
 
 class HoldStrategy:
     def __init__(self, symbols: List[str], lookback_days: int):
