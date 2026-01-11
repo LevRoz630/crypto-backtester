@@ -880,11 +880,15 @@ class TestErrorHandling:
             )
             cache_file = (
                 collector.data_dir
-                / "spot_BTC_USDT_ohlcv_1h_20240101_000000_20240102_000000.parquet"
+                / "spot_BTC_USDT_ohlcv_1h_20240101_000000_20240102_010000.parquet"
             )
             test_data.to_parquet(cache_file)
 
-            result = collector.load_data_period("BTC-USDT", "1h", "ohlcv_spot", start, end)
+            # Mock network calls to prevent API access
+            with patch.object(collector, "collect_spot_ohlcv", return_value=test_data):
+                result = collector.load_data_period(
+                    "BTC-USDT", "1h", "ohlcv_spot", start, end
+                )
 
             # Should still work with aligned boundaries
             assert result is not None
