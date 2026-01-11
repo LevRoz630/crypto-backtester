@@ -4,7 +4,7 @@
 - **Backtester (`src/backtester.py`)**: Orchestrates the time loop, calls `strategy.run_strategy(...)`, passes orders through `PositionManager.filter_orders(...)`, and executes via `OMSClient.set_target_position(...)`. Computes returns, drawdown, Sharpe, and aggregates results.
 - **OMSClient (`src/oms_simulation.py`)**: Tracks `balance['USDT']`, `positions`, and `trade_history`. Provides `get_current_price`, `set_target_position`, `close_position`, `get_total_portfolio_value`, and reporting helpers.
 - **HistoricalDataCollector (`src/hist_data.py`)**: Loads/caches OHLCV and related series via `load_data_period(symbol, timeframe, data_type, start, end)`.
-- **Strategy (e.g., `backtest/strategies/v1_hold.py`)**: Implements `run_strategy(oms_client, data_manager) -> List[order]`.
+- **Strategy (e.g., `examples/01_simple_backtest.py`)**: Implements `run_strategy(oms_client, data_manager) -> List[order]`.
 - **PositionManager (`src/position_manager.py`)**: `filter_orders(orders, oms_client, data_manager)` risk-screens, sizes by inverse-vol, and enforces budget before OMS execution.
 
 ### Data flow (per timestep)
@@ -48,18 +48,21 @@ Timeframe derivation: `Backtester._time_step_to_timeframe(...)` maps `time_step`
 ### Example: Hold strategy + PositionManager
 - Hold emits once per symbol: `{symbol, instrument_type='future', side='LONG'}`; PM sizes under 10% budget with inverse-vol; Backtester executes; OMS maintains state.
 
-Minimal usage (see `backtest/example.py`):
+Minimal usage (see `examples/01_simple_backtest.py`):
 ```python
-from datetime import datetime, timedelta, timezone
-from backtester import Backtester
-from position_manager import PositionManager
-from strategies.v1_hold import HoldStrategy
+from datetime import datetime, timedelta, UTC
 
+from crypto_backtester_binance.backtester import Backtester
+from crypto_backtester_binance.position_manager import PositionManager
+
+# Define your strategy class (see examples/ for full implementations)
 bt = Backtester(historical_data_dir="./historical_data")
-strategy = HoldStrategy(symbols=["BTC-USDT","ETH-USDT"], lookback_days=0)
+strategy = YourStrategy(symbols=["BTC-USDT", "ETH-USDT"], lookback_days=0)
 pm = PositionManager()
-start_date = datetime.now(timezone.utc)-timedelta(days=30)
-end_date = datetime.now(timezone.utc)
+
+start_date = datetime.now(UTC) - timedelta(days=30)
+end_date = datetime.now(UTC)
+
 results = bt.run_backtest(
     strategy=strategy,
     position_manager=pm,
@@ -69,18 +72,17 @@ results = bt.run_backtest(
     market_type="futures",
 )
 
-
-results = backtester.run_permutation_backtest(
+# For permutation testing:
+results = bt.run_permutation_backtest(
     strategy=strategy,
     position_manager=pm,
     start_date=start_date,
     end_date=end_date,
-    time_step=timedelta(days = 1),
+    time_step=timedelta(days=1),
     market_type="futures",
     permutations=3,
 )
 print("p_value:", results.get("p_value"))
-
 ```
 
 
