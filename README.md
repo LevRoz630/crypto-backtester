@@ -1,5 +1,11 @@
 # Crypto Backtester
 
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Tests](https://github.com/LevRoz630/crypto-backtester-binance/workflows/Tests/badge.svg)](https://github.com/LevRoz630/crypto-backtester-binance/actions)
+[![Code Quality](https://github.com/LevRoz630/crypto-backtester-binance/workflows/Code%20Quality/badge.svg)](https://github.com/LevRoz630/crypto-backtester-binance/actions)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
 A backtesting framework for cryptocurrency trading strategies on Binance. Supports spot and perpetual futures markets with risk management, position sizing, and performance analytics.
 
 ## Features
