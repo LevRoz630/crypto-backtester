@@ -3,7 +3,7 @@
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import numpy as np
 import pandas as pd
@@ -23,10 +23,12 @@ def temp_data_dir(tmp_path):
 @pytest.fixture
 def backtester(temp_data_dir):
     """Create a Backtester instance with mocked dependencies."""
-    with patch("crypto_backtester_binance.backtester.HistoricalDataCollector"):
-        with patch("crypto_backtester_binance.backtester.OMSClient"):
-            bt = Backtester(historical_data_dir=temp_data_dir)
-            return bt
+    with (
+        patch("crypto_backtester_binance.backtester.HistoricalDataCollector"),
+        patch("crypto_backtester_binance.backtester.OMSClient"),
+    ):
+        bt = Backtester(historical_data_dir=temp_data_dir)
+        return bt
 
 
 @pytest.fixture
@@ -72,33 +74,37 @@ class TestBacktesterInit:
 
     def test_init_creates_managers(self, temp_data_dir):
         """Test that initialization creates data manager and OMS client."""
-        with patch("crypto_backtester_binance.backtester.HistoricalDataCollector") as mock_hdc:
-            with patch("crypto_backtester_binance.backtester.OMSClient") as mock_oms:
-                bt = Backtester(historical_data_dir=temp_data_dir)
+        with (
+            patch("crypto_backtester_binance.backtester.HistoricalDataCollector") as mock_hdc,
+            patch("crypto_backtester_binance.backtester.OMSClient") as mock_oms,
+        ):
+            bt = Backtester(historical_data_dir=temp_data_dir)
 
-                mock_hdc.assert_called_once_with(temp_data_dir)
-                mock_oms.assert_called_once_with(historical_data_dir=temp_data_dir)
+            mock_hdc.assert_called_once_with(temp_data_dir)
+            mock_oms.assert_called_once_with(historical_data_dir=temp_data_dir)
 
-                assert bt.historical_data_dir == temp_data_dir
-                assert bt.portfolio_values == []
-                assert bt.returns == []
-                assert bt.drawdowns == []
-                assert bt.max_drawdown == 0
-                assert bt.sharpe_ratio == 0
-                assert bt.trade_history == []
-                assert bt.final_balance == 0
-                assert bt.final_positions == []
-                assert bt.position_manager is None
-                assert bt.position_exposures_history == []
-                assert bt.permutation_returns == []
+            assert bt.historical_data_dir == temp_data_dir
+            assert bt.portfolio_values == []
+            assert bt.returns == []
+            assert bt.drawdowns == []
+            assert bt.max_drawdown == 0
+            assert bt.sharpe_ratio == 0
+            assert bt.trade_history == []
+            assert bt.final_balance == 0
+            assert bt.final_positions == []
+            assert bt.position_manager is None
+            assert bt.position_exposures_history == []
+            assert bt.permutation_returns == []
 
     def test_init_with_custom_dir(self):
         """Test initialization with custom directory."""
         custom_dir = "/custom/path"
-        with patch("crypto_backtester_binance.backtester.HistoricalDataCollector"):
-            with patch("crypto_backtester_binance.backtester.OMSClient"):
-                bt = Backtester(historical_data_dir=custom_dir)
-                assert bt.historical_data_dir == custom_dir
+        with (
+            patch("crypto_backtester_binance.backtester.HistoricalDataCollector"),
+            patch("crypto_backtester_binance.backtester.OMSClient"),
+        ):
+            bt = Backtester(historical_data_dir=custom_dir)
+            assert bt.historical_data_dir == custom_dir
 
 
 class TestTimeStepToTimeframe:
@@ -140,9 +146,7 @@ class TestTimeStepToTimeframe:
 class TestRunBacktest:
     """Tests for run_backtest method."""
 
-    def test_run_backtest_missing_time_step(
-        self, backtester, mock_strategy, mock_position_manager
-    ):
+    def test_run_backtest_missing_time_step(self, backtester, mock_strategy, mock_position_manager):
         """Test that run_backtest requires time_step parameter."""
         start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
         end_date = datetime(2024, 1, 2, tzinfo=pd.Timestamp.now("UTC").tz)
@@ -171,21 +175,32 @@ class TestRunPermutationBacktest:
         bt = Backtester(historical_data_dir=str(data_dir))
 
         dates = pd.date_range("2024-01-01", periods=100, freq="1h", tz="UTC")
-        sample_data = pd.DataFrame({
-            "timestamp": dates,
-            "open": np.random.uniform(44000, 46000, 100),
-            "high": np.random.uniform(45000, 47000, 100),
-            "low": np.random.uniform(43000, 45000, 100),
-            "close": np.random.uniform(44000, 46000, 100),
-            "volume": np.random.uniform(100, 1000, 100),
-        })
+        sample_data = pd.DataFrame(
+            {
+                "timestamp": dates,
+                "open": np.random.uniform(44000, 46000, 100),
+                "high": np.random.uniform(45000, 47000, 100),
+                "low": np.random.uniform(43000, 45000, 100),
+                "close": np.random.uniform(44000, 46000, 100),
+                "volume": np.random.uniform(100, 1000, 100),
+            }
+        )
 
         # Need to use actual DataFrame.get() method which returns DataFrame or None
         # Set up data stores with actual data for symbols that will be used
         bt.data_manager.load_data_period = Mock(return_value=sample_data.copy())
-        bt.data_manager.spot_ohlcv_data = {"BTC": sample_data.copy(), "BTC-USDT": sample_data.copy()}
-        bt.data_manager.perpetual_mark_ohlcv_data = {"BTC": sample_data.copy(), "BTC-USDT": sample_data.copy()}
-        bt.data_manager.perpetual_index_ohlcv_data = {"BTC": sample_data.copy(), "BTC-USDT": sample_data.copy()}
+        bt.data_manager.spot_ohlcv_data = {
+            "BTC": sample_data.copy(),
+            "BTC-USDT": sample_data.copy(),
+        }
+        bt.data_manager.perpetual_mark_ohlcv_data = {
+            "BTC": sample_data.copy(),
+            "BTC-USDT": sample_data.copy(),
+        }
+        bt.data_manager.perpetual_index_ohlcv_data = {
+            "BTC": sample_data.copy(),
+            "BTC-USDT": sample_data.copy(),
+        }
 
         bt.oms_client.update_portfolio_value = Mock(return_value=10000.0)
         bt.oms_client.get_position = Mock(return_value=[])
@@ -199,6 +214,7 @@ class TestRunPermutationBacktest:
 
         def set_time(t):
             bt.oms_client.current_time = t
+
         bt.oms_client.set_current_time = Mock(side_effect=set_time)
         bt.oms_client.set_data_manager = Mock()
 
@@ -220,7 +236,9 @@ class TestRunPermutationBacktest:
         pm.filter_orders = Mock(return_value=[])
         return pm
 
-    def test_permutation_backtest_missing_time_step(self, permutation_backtester, perm_strategy, perm_position_manager):
+    def test_permutation_backtest_missing_time_step(
+        self, permutation_backtester, perm_strategy, perm_position_manager
+    ):
         """Test permutation backtest requires time_step."""
         start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
         end_date = datetime(2024, 1, 2, tzinfo=pd.Timestamp.now("UTC").tz)
@@ -236,7 +254,9 @@ class TestRunPermutationBacktest:
                 permutations=2,
             )
 
-    def test_permutation_backtest_spot(self, permutation_backtester, perm_strategy, perm_position_manager):
+    def test_permutation_backtest_spot(
+        self, permutation_backtester, perm_strategy, perm_position_manager
+    ):
         """Test permutation backtest with spot market."""
         perm_strategy.symbols = ["BTC-USDT"]
         start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
@@ -254,7 +274,9 @@ class TestRunPermutationBacktest:
 
         assert result is not None
 
-    def test_permutation_backtest_futures(self, permutation_backtester, perm_strategy, perm_position_manager):
+    def test_permutation_backtest_futures(
+        self, permutation_backtester, perm_strategy, perm_position_manager
+    ):
         """Test permutation backtest with futures market."""
         start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
         end_date = datetime(2024, 1, 1, 2, tzinfo=pd.Timestamp.now("UTC").tz)
@@ -271,7 +293,9 @@ class TestRunPermutationBacktest:
 
         assert result is not None
 
-    def test_permutation_backtest_invalid_market(self, permutation_backtester, perm_strategy, perm_position_manager):
+    def test_permutation_backtest_invalid_market(
+        self, permutation_backtester, perm_strategy, perm_position_manager
+    ):
         """Test permutation backtest with invalid market type."""
         start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
         end_date = datetime(2024, 1, 1, 2, tzinfo=pd.Timestamp.now("UTC").tz)
@@ -520,14 +544,16 @@ class TestRunBacktestIntegration:
 
         # Create sample data
         dates = pd.date_range("2024-01-01", periods=50, freq="1h", tz="UTC")
-        sample_data = pd.DataFrame({
-            "timestamp": dates,
-            "open": [45000.0] * 50,
-            "high": [45100.0] * 50,
-            "low": [44900.0] * 50,
-            "close": [45000.0] * 50,
-            "volume": [100.0] * 50,
-        })
+        sample_data = pd.DataFrame(
+            {
+                "timestamp": dates,
+                "open": [45000.0] * 50,
+                "high": [45100.0] * 50,
+                "low": [44900.0] * 50,
+                "close": [45000.0] * 50,
+                "volume": [100.0] * 50,
+            }
+        )
 
         # Mock data manager methods
         bt.data_manager.load_data_period = Mock(return_value=sample_data)
@@ -546,6 +572,7 @@ class TestRunBacktestIntegration:
 
         def set_time(t):
             bt.oms_client.current_time = t
+
         bt.oms_client.set_current_time = Mock(side_effect=set_time)
         bt.oms_client.set_data_manager = Mock()
 
@@ -557,9 +584,16 @@ class TestRunBacktestIntegration:
         strategy = Mock()
         strategy.symbols = ["BTC-USDT-PERP"]
         strategy.lookback_days = 1
-        strategy.run_strategy = Mock(return_value=[
-            {"symbol": "BTC-USDT-PERP", "instrument_type": "future", "side": "LONG", "value": 1000.0}
-        ])
+        strategy.run_strategy = Mock(
+            return_value=[
+                {
+                    "symbol": "BTC-USDT-PERP",
+                    "instrument_type": "future",
+                    "side": "LONG",
+                    "value": 1000.0,
+                }
+            ]
+        )
         return strategy
 
     @pytest.fixture
@@ -569,12 +603,16 @@ class TestRunBacktestIntegration:
         pm.filter_orders = Mock(side_effect=lambda orders, **kwargs: orders)
         return pm
 
-    def test_run_backtest_spot_market(self, integrated_backtester, simple_strategy, simple_position_manager):
+    def test_run_backtest_spot_market(
+        self, integrated_backtester, simple_strategy, simple_position_manager
+    ):
         """Test run_backtest with spot market."""
         simple_strategy.symbols = ["BTC-USDT"]
-        simple_strategy.run_strategy = Mock(return_value=[
-            {"symbol": "BTC-USDT", "instrument_type": "spot", "side": "LONG", "value": 1000.0}
-        ])
+        simple_strategy.run_strategy = Mock(
+            return_value=[
+                {"symbol": "BTC-USDT", "instrument_type": "spot", "side": "LONG", "value": 1000.0}
+            ]
+        )
 
         start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
         end_date = datetime(2024, 1, 1, 2, tzinfo=pd.Timestamp.now("UTC").tz)
@@ -591,7 +629,9 @@ class TestRunBacktestIntegration:
         assert result is not None
         assert "final_balance" in result or result.get("portfolio_values") is not None
 
-    def test_run_backtest_futures_market(self, integrated_backtester, simple_strategy, simple_position_manager):
+    def test_run_backtest_futures_market(
+        self, integrated_backtester, simple_strategy, simple_position_manager
+    ):
         """Test run_backtest with futures market."""
         start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
         end_date = datetime(2024, 1, 1, 2, tzinfo=pd.Timestamp.now("UTC").tz)
@@ -607,13 +647,15 @@ class TestRunBacktestIntegration:
 
         assert result is not None
 
-    def test_run_backtest_invalid_market_type(self, integrated_backtester, simple_strategy, simple_position_manager):
+    def test_run_backtest_invalid_market_type(
+        self, integrated_backtester, simple_strategy, simple_position_manager
+    ):
         """Test run_backtest with invalid market type."""
         start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
         end_date = datetime(2024, 1, 1, 2, tzinfo=pd.Timestamp.now("UTC").tz)
 
-        # Invalid market type should log error and continue
-        result = integrated_backtester.run_backtest(
+        # Invalid market type should log error and continue (not crash)
+        integrated_backtester.run_backtest(
             strategy=simple_strategy,
             position_manager=simple_position_manager,
             start_date=start_date,
@@ -622,10 +664,9 @@ class TestRunBacktestIntegration:
             market_type="invalid",
         )
 
-        # Should still return something (might be None due to no data)
-        # The key is it doesn't crash
-
-    def test_run_backtest_strategy_orders_executed(self, integrated_backtester, simple_strategy, simple_position_manager):
+    def test_run_backtest_strategy_orders_executed(
+        self, integrated_backtester, simple_strategy, simple_position_manager
+    ):
         """Test that strategy orders are executed."""
         start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
         end_date = datetime(2024, 1, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
@@ -644,7 +685,9 @@ class TestRunBacktestIntegration:
         # Position manager should have filtered orders
         assert simple_position_manager.filter_orders.called
 
-    def test_run_backtest_with_none_orders(self, integrated_backtester, simple_strategy, simple_position_manager):
+    def test_run_backtest_with_none_orders(
+        self, integrated_backtester, simple_strategy, simple_position_manager
+    ):
         """Test run_backtest when strategy returns no orders."""
         simple_strategy.run_strategy = Mock(return_value=None)
         simple_position_manager.filter_orders = Mock(return_value=None)
@@ -664,7 +707,9 @@ class TestRunBacktestIntegration:
         # Should complete without errors
         assert result is not None
 
-    def test_run_backtest_position_exposure_tracking(self, integrated_backtester, simple_strategy, simple_position_manager):
+    def test_run_backtest_position_exposure_tracking(
+        self, integrated_backtester, simple_strategy, simple_position_manager
+    ):
         """Test that position exposures are tracked."""
         # Setup position for exposure tracking
         integrated_backtester.oms_client.positions = {
@@ -686,9 +731,13 @@ class TestRunBacktestIntegration:
         # Position exposures should be tracked
         assert len(integrated_backtester.position_exposures_history) > 0
 
-    def test_run_backtest_order_execution_error_handling(self, integrated_backtester, simple_strategy, simple_position_manager):
+    def test_run_backtest_order_execution_error_handling(
+        self, integrated_backtester, simple_strategy, simple_position_manager
+    ):
         """Test that order execution errors are handled gracefully."""
-        integrated_backtester.oms_client.set_target_position = Mock(side_effect=Exception("Order failed"))
+        integrated_backtester.oms_client.set_target_position = Mock(
+            side_effect=Exception("Order failed")
+        )
 
         start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
         end_date = datetime(2024, 1, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
@@ -729,7 +778,10 @@ class TestBacktestResults:
 
     def test_trade_history_accessible(self, backtester_with_results):
         """Test trade history is accessible via oms_client."""
-        assert backtester_with_results.oms_client.trade_history == backtester_with_results.trade_history
+        assert (
+            backtester_with_results.oms_client.trade_history
+            == backtester_with_results.trade_history
+        )
 
     def test_final_balance_accessible(self, backtester_with_results):
         """Test final balance is set correctly."""
@@ -747,14 +799,16 @@ class TestBacktestEdgeCases:
         bt = Backtester(historical_data_dir=str(data_dir))
 
         dates = pd.date_range("2024-01-01", periods=50, freq="1h", tz="UTC")
-        sample_data = pd.DataFrame({
-            "timestamp": dates,
-            "open": [45000.0] * 50,
-            "high": [45100.0] * 50,
-            "low": [44900.0] * 50,
-            "close": [45000.0] * 50,
-            "volume": [100.0] * 50,
-        })
+        sample_data = pd.DataFrame(
+            {
+                "timestamp": dates,
+                "open": [45000.0] * 50,
+                "high": [45100.0] * 50,
+                "low": [44900.0] * 50,
+                "close": [45000.0] * 50,
+                "volume": [100.0] * 50,
+            }
+        )
 
         bt.data_manager.load_data_period = Mock(return_value=sample_data)
         bt.data_manager.spot_ohlcv_data = {"BTC": sample_data}
@@ -773,6 +827,7 @@ class TestBacktestEdgeCases:
 
         def set_time(t):
             bt.oms_client.current_time = t
+
         bt.oms_client.set_current_time = Mock(side_effect=set_time)
         bt.oms_client.set_data_manager = Mock()
 
@@ -795,7 +850,9 @@ class TestBacktestEdgeCases:
         return pm
 
     @patch("crypto_backtester_binance.backtester.format_positions_table")
-    def test_backtest_with_positions_error(self, mock_format, edge_backtester, edge_strategy, edge_pm):
+    def test_backtest_with_positions_error(
+        self, mock_format, edge_backtester, edge_strategy, edge_pm
+    ):
         """Test backtest handles position formatting errors gracefully."""
         mock_format.side_effect = Exception("Format error")
 
@@ -836,6 +893,7 @@ class TestBacktestEdgeCases:
     def test_backtest_iteration_error_recovery(self, edge_backtester, edge_strategy, edge_pm):
         """Test backtest recovers from iteration errors."""
         call_count = [0]
+
         def failing_update():
             call_count[0] += 1
             if call_count[0] == 1:
@@ -871,14 +929,16 @@ class TestDataAlignment:
 
         # Create data with naive timestamps (no timezone)
         dates_naive = pd.date_range("2024-01-01", periods=50, freq="1h")
-        sample_data_naive = pd.DataFrame({
-            "timestamp": dates_naive,
-            "open": [45000.0] * 50,
-            "high": [45100.0] * 50,
-            "low": [44900.0] * 50,
-            "close": [45000.0] * 50,
-            "volume": [100.0] * 50,
-        })
+        sample_data_naive = pd.DataFrame(
+            {
+                "timestamp": dates_naive,
+                "open": [45000.0] * 50,
+                "high": [45100.0] * 50,
+                "low": [44900.0] * 50,
+                "close": [45000.0] * 50,
+                "volume": [100.0] * 50,
+            }
+        )
 
         bt.data_manager.load_data_period = Mock(return_value=sample_data_naive)
         bt.data_manager.spot_ohlcv_data = {"BTC": sample_data_naive}
@@ -897,6 +957,7 @@ class TestDataAlignment:
 
         def set_time(t):
             bt.oms_client.current_time = t
+
         bt.oms_client.set_current_time = Mock(side_effect=set_time)
         bt.oms_client.set_data_manager = Mock()
 
@@ -918,7 +979,9 @@ class TestDataAlignment:
         pm.filter_orders = Mock(return_value=[])
         return pm
 
-    def test_timezone_naive_data_alignment(self, alignment_backtester, alignment_strategy, alignment_pm):
+    def test_timezone_naive_data_alignment(
+        self, alignment_backtester, alignment_strategy, alignment_pm
+    ):
         """Test backtest handles timezone-naive data correctly."""
         start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
         end_date = datetime(2024, 1, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)

@@ -267,9 +267,7 @@ class HistoricalDataCollector:
 
         def _floor_to_tf(dt: datetime) -> datetime:
             # Floor to nearest timeframe boundary in UTC
-            epoch_minutes = int(
-                (dt - datetime(1970, 1, 1, tzinfo=UTC)).total_seconds() // 60
-            )
+            epoch_minutes = int((dt - datetime(1970, 1, 1, tzinfo=UTC)).total_seconds() // 60)
             floored_minutes = (epoch_minutes // minutes) * minutes
             return datetime(1970, 1, 1, tzinfo=UTC) + timedelta(minutes=floored_minutes)
 

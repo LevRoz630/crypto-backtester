@@ -1,7 +1,7 @@
 """Comprehensive tests for OMS simulation."""
 
-from datetime import datetime, timedelta
-from unittest.mock import Mock, patch
+from datetime import datetime
+from unittest.mock import Mock
 
 import pandas as pd
 import pytest

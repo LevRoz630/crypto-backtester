@@ -70,7 +70,7 @@ class MomentumStrategy:
         if len(daily) < self.sma_period:
             return None
 
-        sma = daily.iloc[-self.sma_period:].mean()
+        sma = daily.iloc[-self.sma_period :].mean()
         return float(sma)
 
     def _get_current_price(self, symbol: str, oms_client: OMSClient) -> float | None:
@@ -105,19 +105,23 @@ class MomentumStrategy:
             # Momentum signal
             if current_price > sma:
                 # Price above SMA -> bullish -> go long
-                orders.append({
-                    "symbol": perp_symbol,
-                    "instrument_type": "future",
-                    "side": "LONG",
-                })
+                orders.append(
+                    {
+                        "symbol": perp_symbol,
+                        "instrument_type": "future",
+                        "side": "LONG",
+                    }
+                )
                 logger.info(f"{symbol}: LONG (price {current_price:.2f} > SMA {sma:.2f})")
             else:
                 # Price below SMA -> bearish -> go short
-                orders.append({
-                    "symbol": perp_symbol,
-                    "instrument_type": "future",
-                    "side": "SHORT",
-                })
+                orders.append(
+                    {
+                        "symbol": perp_symbol,
+                        "instrument_type": "future",
+                        "side": "SHORT",
+                    }
+                )
                 logger.info(f"{symbol}: SHORT (price {current_price:.2f} < SMA {sma:.2f})")
 
         return orders

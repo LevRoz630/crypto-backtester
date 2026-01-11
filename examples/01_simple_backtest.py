@@ -53,11 +53,13 @@ class HoldStrategy:
             usdt_balance = oms_client.balance.get("USDT", 0)
             if usdt_balance > 0:
                 for symbol in self.symbols:
-                    orders.append({
-                        "symbol": symbol,
-                        "instrument_type": "future",
-                        "side": "LONG",
-                    })
+                    orders.append(
+                        {
+                            "symbol": symbol,
+                            "instrument_type": "future",
+                            "side": "LONG",
+                        }
+                    )
             self.has_bought = True
 
         return orders

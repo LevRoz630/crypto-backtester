@@ -1,7 +1,5 @@
 """Tests for format_utils module."""
 
-import pytest
-
 from crypto_backtester_binance.format_utils import (
     format_balances_table,
     format_batch_result,

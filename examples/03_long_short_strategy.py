@@ -198,44 +198,54 @@ class LongShortStrategy:
 
         if not altcoin_weights:
             # No altcoins to short, close all positions
-            orders.append({
-                "symbol": self.btc_symbol,
-                "instrument_type": "future",
-                "side": "CLOSE",
-            })
-            for alt in self.altcoin_symbols:
-                orders.append({
-                    "symbol": alt,
+            orders.append(
+                {
+                    "symbol": self.btc_symbol,
                     "instrument_type": "future",
                     "side": "CLOSE",
-                })
+                }
+            )
+            for alt in self.altcoin_symbols:
+                orders.append(
+                    {
+                        "symbol": alt,
+                        "instrument_type": "future",
+                        "side": "CLOSE",
+                    }
+                )
             return orders
 
         # Long BTC
-        orders.append({
-            "symbol": self.btc_symbol,
-            "instrument_type": "future",
-            "alloc_frac": self.btc_ratio,
-            "side": "LONG",
-        })
+        orders.append(
+            {
+                "symbol": self.btc_symbol,
+                "instrument_type": "future",
+                "alloc_frac": self.btc_ratio,
+                "side": "LONG",
+            }
+        )
 
         # Short altcoins
         for alt_sym, weight in altcoin_weights.items():
-            orders.append({
-                "symbol": alt_sym,
-                "instrument_type": "future",
-                "alloc_frac": (1.0 - self.btc_ratio) * weight,
-                "side": "SHORT",
-            })
+            orders.append(
+                {
+                    "symbol": alt_sym,
+                    "instrument_type": "future",
+                    "alloc_frac": (1.0 - self.btc_ratio) * weight,
+                    "side": "SHORT",
+                }
+            )
 
         # Close positions for altcoins not in current portfolio
         for alt_sym in self.altcoin_symbols:
             if alt_sym not in altcoin_weights:
-                orders.append({
-                    "symbol": alt_sym,
-                    "instrument_type": "future",
-                    "side": "CLOSE",
-                })
+                orders.append(
+                    {
+                        "symbol": alt_sym,
+                        "instrument_type": "future",
+                        "side": "CLOSE",
+                    }
+                )
 
         self.last_rebalance_day = current_day
         return orders
@@ -264,11 +274,13 @@ class LongShortPositionManager:
             threshold = 0.95 * entry_price * qty
             if current_value < threshold:
                 logger.info(f"Stop loss triggered for {pos['symbol']}")
-                orders.append({
-                    "symbol": pos["symbol"],
-                    "instrument_type": pos["instrument_type"],
-                    "side": "CLOSE",
-                })
+                orders.append(
+                    {
+                        "symbol": pos["symbol"],
+                        "instrument_type": pos["instrument_type"],
+                        "side": "CLOSE",
+                    }
+                )
 
         return orders
 
