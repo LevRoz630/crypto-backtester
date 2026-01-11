@@ -1,15 +1,39 @@
+"""
+Reference Position Manager Implementation
+
+This module provides a sample PositionManager that users can customize.
+The position manager handles:
+- Risk screening based on volatility
+- Position sizing using inverse-volatility weighting
+- Budget enforcement
+
+Users should create their own position manager tailored to their strategy.
+The only requirement is implementing the `filter_orders` method.
+"""
+
 import logging
 from datetime import timedelta
 from typing import Any
 
 import numpy as np
 
-from .hist_data import HistoricalDataCollector
+from crypto_backtester_binance.hist_data import HistoricalDataCollector
 
 logger = logging.getLogger(__name__)
 
 
 class PositionManager:
+    """
+    Reference position manager with inverse-volatility sizing.
+
+    This implementation:
+    - Risk screens orders using 4-hour volatility (threshold: 0.1 scaled vol)
+    - Sizes positions using inverse-volatility weighting
+    - Allocates 10% of USDT balance per time step
+
+    Users should customize this class or create their own implementation.
+    """
+
     def __init__(self):
         self.orders = []
         self.oms_client = None
@@ -26,7 +50,13 @@ class PositionManager:
         2) Size remaining orders using inverse-vol weights under a USDT budget.
         3) Enforce balance constraint; if sized orders exceed cash, reject the batch.
 
-        Returns a list of enriched order dicts or None if rejected.
+        Args:
+            orders: List of order dicts from strategy
+            oms_client: OMS client for balance/position info
+            data_manager: Historical data collector for volatility calculation
+
+        Returns:
+            List of enriched order dicts or None if rejected.
         """
         self.oms_client = oms_client
         self.data_manager = data_manager
@@ -59,9 +89,8 @@ class PositionManager:
         """
         Mark orders as value=0 when recent realized vol is above a threshold.
 
-        - Uses 4 hours of 15m mark OHLCV to compute scaled volatility
-          (std/mean). Current threshold: 0.1.
-        - Futures data is stored under base symbols; '-PERP' suffix is removed.
+        Uses 4 hours of 15m mark OHLCV to compute scaled volatility (std/mean).
+        Current threshold: 0.1.
         """
         cleaned: list[dict[str, Any]] = []
         for order in orders:
@@ -94,11 +123,10 @@ class PositionManager:
         """
         Size orders by inverse volatility under a budget cap.
 
-        - Budget: 10% of current USDT balance (conservative sizing).
-        - For each non-zero order, compute 1/scaled_vol over last 1 day of 15m data.
-        - Allocate proportionally to inverse-vol weights.
+        Budget: 10% of current USDT balance (conservative sizing).
+        For each non-zero order, compute 1/scaled_vol over last 1 day of 15m data.
+        Allocate proportionally to inverse-vol weights.
         """
-        # Work on a copy to avoid mutating the input list unexpectedly
         updated: list[dict[str, Any]] = []
         limit = self.oms_client.balance["USDT"] / 10
 

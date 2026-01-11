@@ -6,12 +6,39 @@ A backtesting framework for cryptocurrency trading strategies.
 
 ```python
 from datetime import datetime, timedelta, timezone
-from crypto_backtester_binance import Backtester, PositionManager
-from backtest.example.v1_hold import HoldStrategy
+from typing import Any
+
+from crypto_backtester_binance import Backtester, HistoricalDataCollector
+
+
+# Define your strategy
+class HoldStrategy:
+    def __init__(self, symbols: list[str]):
+        self.symbols = symbols
+        self.has_bought = False
+
+    def run_strategy(self, oms_client, data_manager):
+        if self.has_bought:
+            return []
+        self.has_bought = True
+        return [{"symbol": s, "instrument_type": "future", "side": "LONG"} for s in self.symbols]
+
+
+# Define your position manager (user-defined risk management)
+class SimplePositionManager:
+    def filter_orders(
+        self, orders: list[dict[str, Any]], oms_client: Any, data_manager: HistoricalDataCollector
+    ) -> list[dict[str, Any]] | None:
+        if not orders:
+            return None
+        budget = oms_client.balance["USDT"] * 0.1 / len(orders)
+        return [{**order, "value": budget} for order in orders]
+
 
 bt = Backtester(historical_data_dir="./historical_data")
-strategy = HoldStrategy(symbols=["BTC-USDT","ETH-USDT"], lookback_days=0)
-pm = PositionManager()
+strategy = HoldStrategy(symbols=["BTC-USDT", "ETH-USDT"])
+pm = SimplePositionManager()
+
 start_date = datetime.now(timezone.utc) - timedelta(days=30)
 end_date = datetime.now(timezone.utc)
 
@@ -28,7 +55,7 @@ results = bt.run_backtest(
 ## Installation
 
 ```bash
-pip install -e ".[docs]"
+pip install crypto-backtester-binance
 ```
 
 ## Building Documentation
@@ -39,4 +66,3 @@ mkdocs serve  # Preview at http://127.0.0.1:8000
 ```
 
 See [Overview](overview.md) for architecture details.
-

@@ -16,11 +16,11 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
+from position_manager import PositionManager
 
 from crypto_backtester_binance.backtester import Backtester
 from crypto_backtester_binance.hist_data import HistoricalDataCollector
 from crypto_backtester_binance.oms_simulation import OMSClient
-from crypto_backtester_binance.position_manager import PositionManager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)

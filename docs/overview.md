@@ -1,19 +1,18 @@
 ## Backtest Engine: Structure and Workflow
 
 ### Components
-- **Backtester (`src/backtester.py`)**: Orchestrates the time loop, calls `strategy.run_strategy(...)`, passes orders through `PositionManager.filter_orders(...)`, and executes via `OMSClient.set_target_position(...)`. Computes returns, drawdown, Sharpe, and aggregates results.
+- **Backtester (`src/backtester.py`)**: Orchestrates the time loop, calls `strategy.run_strategy(...)`, passes orders through the user's position manager `filter_orders(...)`, and executes via `OMSClient.set_target_position(...)`. Computes returns, drawdown, Sharpe, and aggregates results.
 - **OMSClient (`src/oms_simulation.py`)**: Tracks `balance['USDT']`, `positions`, and `trade_history`. Provides `get_current_price`, `set_target_position`, `close_position`, `get_total_portfolio_value`, and reporting helpers.
 - **HistoricalDataCollector (`src/hist_data.py`)**: Loads/caches OHLCV and related series via `load_data_period(symbol, timeframe, data_type, start, end)`.
-- **Strategy (e.g., `examples/01_simple_backtest.py`)**: Implements `run_strategy(oms_client, data_manager) -> List[order]`.
-- **PositionManager (`src/position_manager.py`)**: `filter_orders(orders, oms_client, data_manager)` risk-screens, sizes by inverse-vol, and enforces budget before OMS execution.
+- **Strategy (user-defined)**: Implements `run_strategy(oms_client, data_manager) -> List[order]`.
+- **PositionManager (user-defined)**: Implements `filter_orders(orders, oms_client, data_manager)` to risk-screen, size positions, and enforce budget before OMS execution.
 
 ### Data flow (per timestep)
 1) Backtester revalues portfolio via `OMSClient.get_total_portfolio_value()`; logs positions.
 2) Strategy emits raw orders: `run_strategy(oms_client, data_manager) -> List[Dict]`.
 3) PositionManager:
-   - Risk screen on last 4h of 15m mark OHLCV; if scaled vol > 0.1, set `value=0`.
-   - Size remaining orders by inverse-vol weights under a 10% USDT budget.
-   - If sized opens exceed cash, return only any `CLOSE` orders; otherwise return combined list.
+   - Processes orders through `filter_orders(orders, oms_client, data_manager)`
+   - Returns orders with `value` field set (USDT notional), or None to skip
 4) Backtester executes each order via `OMSClient.set_target_position(symbol, instrument_type, value, side)`.
 5) Advance `current_time` by `time_step`; repeat until `end_date`.
 
@@ -23,7 +22,7 @@
   "symbol": "BTC-USDT",                // or base + -PERP-normalized internally for futures
   "instrument_type": "future",
   "side": "LONG" | "SHORT" | "CLOSE",
-  "value": 1234.56                      // USDT notional; PM supplies, it is possible to rewrite for the strategy to supply it as well
+  "value": 1234.56                      // USDT notional; PositionManager supplies this
 }
 ```
  ### Data storage map
@@ -46,19 +45,42 @@ Timeframe derivation: `Backtester._time_step_to_timeframe(...)` maps `time_step`
 - Futures do not move principal cash on open/adjust; spot subtracts cash. Portfolio value for futures adds unrealized PnL only; spot adds full notional value.
 
 ### Example: Hold strategy + PositionManager
-- Hold emits once per symbol: `{symbol, instrument_type='future', side='LONG'}`; PM sizes under 10% budget with inverse-vol; Backtester executes; OMS maintains state.
-
-Minimal usage (see `examples/01_simple_backtest.py`):
+Minimal usage (see `examples/` for full implementations):
 ```python
 from datetime import datetime, timedelta, UTC
+from typing import Any
 
 from crypto_backtester_binance.backtester import Backtester
-from crypto_backtester_binance.position_manager import PositionManager
+from crypto_backtester_binance.hist_data import HistoricalDataCollector
 
-# Define your strategy class (see examples/ for full implementations)
+
+# User-defined strategy
+class HoldStrategy:
+    def __init__(self, symbols: list[str]):
+        self.symbols = symbols
+        self.has_bought = False
+
+    def run_strategy(self, oms_client, data_manager):
+        if self.has_bought:
+            return []
+        self.has_bought = True
+        return [{"symbol": s, "instrument_type": "future", "side": "LONG"} for s in self.symbols]
+
+
+# User-defined position manager
+class SimplePositionManager:
+    def filter_orders(
+        self, orders: list[dict[str, Any]], oms_client: Any, data_manager: HistoricalDataCollector
+    ) -> list[dict[str, Any]] | None:
+        if not orders:
+            return None
+        budget = oms_client.balance["USDT"] * 0.1 / len(orders)
+        return [{**order, "value": budget} for order in orders]
+
+
 bt = Backtester(historical_data_dir="./historical_data")
-strategy = YourStrategy(symbols=["BTC-USDT", "ETH-USDT"], lookback_days=0)
-pm = PositionManager()
+strategy = HoldStrategy(symbols=["BTC-USDT", "ETH-USDT"])
+pm = SimplePositionManager()
 
 start_date = datetime.now(UTC) - timedelta(days=30)
 end_date = datetime.now(UTC)
@@ -85,4 +107,4 @@ results = bt.run_permutation_backtest(
 print("p_value:", results.get("p_value"))
 ```
 
-
+See `examples/position_manager.py` for a reference implementation with volatility-based risk screening and inverse-vol position sizing.

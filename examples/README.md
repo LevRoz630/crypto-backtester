@@ -46,6 +46,16 @@ A market-neutral strategy that:
 python examples/03_long_short_strategy.py
 ```
 
+### position_manager.py
+
+A reference implementation of a position manager with:
+- Volatility-based risk screening (4h scaled vol threshold)
+- Inverse-volatility position sizing
+- Budget enforcement (10% of USDT balance per step)
+- CLOSE order passthrough
+
+This file is imported by the example scripts. Customize it for your own risk management needs.
+
 ## Strategy Interface
 
 All strategies must implement the following interface:
@@ -78,7 +88,8 @@ class MyStrategy:
 
 ## Position Manager Interface
 
-Position managers handle risk screening and position sizing:
+Position managers are **user-defined** - you create them to match your risk management needs.
+The only requirement is implementing the `filter_orders` method:
 
 ```python
 class MyPositionManager:
@@ -87,11 +98,23 @@ class MyPositionManager:
         orders: list[dict],
         oms_client: OMSClient,
         data_manager: HistoricalDataCollector,
-    ) -> list[dict]:
+    ) -> list[dict] | None:
         """
-        Filter and size orders based on risk criteria.
+        Process orders from strategy before execution.
 
-        Returns modified orders with position sizes.
+        Args:
+            orders: Raw orders from strategy
+            oms_client: Access to balance, positions, current time
+            data_manager: Access to historical data
+
+        Returns:
+            List of orders with 'value' field set (USDT notional), or None to skip
         """
-        return orders
+        if not orders:
+            return None
+        # Simple equal-weight: 10% of balance split across orders
+        budget = oms_client.balance["USDT"] * 0.1 / len(orders)
+        return [{**order, "value": budget} for order in orders]
 ```
+
+See `position_manager.py` for a more sophisticated reference implementation.

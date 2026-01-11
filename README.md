@@ -15,7 +15,7 @@ A backtesting framework for cryptocurrency trading strategies on Binance. Suppor
 
 - **Historical Data Collection**: Automated collection and caching of OHLCV, trades, funding rates, and open interest data
 - **Strategy Backtesting**: Run strategies over historical data with configurable time steps
-- **Risk Management**: Built-in position manager with volatility-based risk screening and inverse-vol weighting
+- **Risk Management**: User-defined position manager for custom risk screening and position sizing
 - **OMS Simulation**: Order management system that tracks positions, balances, and trade history
 - **Performance Metrics**: Returns, Sharpe ratio, drawdown, and permutation testing
 - **Multiple Market Types**: Support for both spot and perpetual futures markets
@@ -58,9 +58,9 @@ crypto-backtester-binance/
 │   ├── backtester.py               # Main backtest orchestrator
 │   ├── oms_simulation.py           # Order management system
 │   ├── hist_data.py                # Historical data collector
-│   ├── position_manager.py         # Risk management & position sizing
 │   └── utils.py                    # Utility functions
 ├── examples/                       # Example scripts
+│   ├── position_manager.py         # Reference position manager (user-defined)
 │   ├── 01_simple_backtest.py       # Buy-and-hold strategy
 │   ├── 02_momentum_strategy.py     # SMA crossover strategy
 │   └── 03_long_short_strategy.py   # Long BTC / Short Alts
@@ -75,11 +75,11 @@ crypto-backtester-binance/
 
 ```python
 from datetime import datetime, timedelta, UTC
+from typing import Any
 
 from crypto_backtester_binance.backtester import Backtester
 from crypto_backtester_binance.hist_data import HistoricalDataCollector
 from crypto_backtester_binance.oms_simulation import OMSClient
-from crypto_backtester_binance.position_manager import PositionManager
 
 
 # Define a simple strategy
@@ -98,12 +98,25 @@ class HoldStrategy:
         return orders
 
 
+# Define a position manager (user-defined risk management)
+class SimplePositionManager:
+    def filter_orders(
+        self, orders: list[dict[str, Any]], oms_client: Any, data_manager: HistoricalDataCollector
+    ) -> list[dict[str, Any]] | None:
+        """Add position sizing to orders. Must return orders with 'value' field."""
+        if not orders:
+            return None
+        # Simple equal-weight allocation: 10% of balance per order
+        budget = oms_client.balance["USDT"] * 0.1 / len(orders)
+        return [{**order, "value": budget} for order in orders]
+
+
 # Initialize backtester
 backtester = Backtester(historical_data_dir="./historical_data")
 
 # Create strategy and position manager
 strategy = HoldStrategy(symbols=["BTC-USDT", "ETH-USDT", "SOL-USDT"])
-position_manager = PositionManager()
+position_manager = SimplePositionManager()
 
 # Set backtest period
 start_date = datetime.now(UTC) - timedelta(days=50)
@@ -215,13 +228,33 @@ Supported time deltas map to data timeframes:
 
 ### Position Manager
 
-The default `PositionManager`:
-- Risk screens orders using 4-hour volatility (sets `value=0` if scaled vol > 0.1)
-- Sizes orders using inverse-volatility weighting
-- Allocates 10% of USDT balance per backtest step
-- Enforces cash constraints
+The position manager is **user-defined** - you create it to match your risk management needs.
+It must implement a `filter_orders` method with this signature:
 
-You can create custom position managers by extending the `PositionManager` class.
+```python
+def filter_orders(
+    self,
+    orders: list[dict],
+    oms_client: OMSClient,
+    data_manager: HistoricalDataCollector
+) -> list[dict] | None:
+    """
+    Process orders from strategy before execution.
+
+    Args:
+        orders: Raw orders from strategy
+        oms_client: Access to balance, positions, current time
+        data_manager: Access to historical data
+
+    Returns:
+        List of orders with 'value' field set, or None to skip
+    """
+```
+
+See `examples/position_manager.py` for a reference implementation with:
+- Volatility-based risk screening
+- Inverse-volatility position sizing
+- Budget enforcement
 
 ## Documentation
 

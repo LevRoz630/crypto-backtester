@@ -26,10 +26,10 @@ nav:
   - API Reference:
     - Backtester: api/backtester.md
     - OMSClient: api/oms_client.md
-    - PositionManager: api/position_manager.md
     - HistoricalDataCollector: api/historical_data.md
   - Method Docs:
     - Backtester.run_backtest: methods/Backtester.run_backtest.md
     - Backtester.run_permutation_backtest: methods/Backtester.run_permutation_backtest.md
-    - PositionManager.filter_orders: methods/PositionManager.filter_orders.md
+  - Guides:
+    - Position Manager: methods/PositionManager.filter_orders.md
 

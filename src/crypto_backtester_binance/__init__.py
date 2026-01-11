@@ -8,13 +8,11 @@ including data collection, order management simulation, and performance analytic
 from .backtester import Backtester
 from .hist_data import HistoricalDataCollector
 from .oms_simulation import OMSClient
-from .position_manager import PositionManager
 
 __all__ = [
     "Backtester",
     "OMSClient",
     "HistoricalDataCollector",
-    "PositionManager",
 ]
 
 __version__ = "0.1.0"

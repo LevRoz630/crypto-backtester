@@ -1,15 +1,64 @@
-## PositionManager.filter_orders
+## Creating a Position Manager
 
-### Summary
-Validates and sizes raw strategy orders. Risk-screens by short-horizon vol, sizes by inverse-vol weights under a 10% USDT budget, and enforces cash constraints.
+The position manager is a **user-defined component** that processes orders from your strategy before execution. It handles risk management, position sizing, and budget enforcement.
 
-### Signature
-`filter_orders(orders, oms_client, data_manager) -> List[Dict] | None`
+### Required Interface
 
-### Steps and data usage
-1. Split `CLOSE` orders to always allow exits.
-2. `_close_risky_orders` loads `mark_ohlcv_futures` (15m, 4h window) from `HistoricalDataCollector.perpetual_mark_ohlcv_data[base_symbol]`; sets `value=0` if scaled vol > 0.1.
-3. `_set_weights` loads 1d of 15m mark data and computes inverse-vol weights; allocates 10% of `balance['USDT']` proportionally.
-4. If sized opens exceed cash, return only `CLOSE` orders; else combined result.
+Your position manager must implement the `filter_orders` method:
 
+```python
+def filter_orders(
+    self,
+    orders: list[dict],
+    oms_client: OMSClient,
+    data_manager: HistoricalDataCollector
+) -> list[dict] | None
+```
 
+### Parameters
+
+- **orders**: List of order dictionaries from your strategy
+- **oms_client**: Access to balance, positions, current time via:
+  - `oms_client.balance["USDT"]` - current cash balance
+  - `oms_client.positions` - current open positions
+  - `oms_client.current_time` - current backtest timestamp
+- **data_manager**: Access to historical data via `load_data_period()`
+
+### Return Value
+
+- List of order dicts with `value` field set (USDT notional amount)
+- Return `None` to skip all orders for this timestep
+
+### Example: Simple Equal-Weight
+
+```python
+class SimplePositionManager:
+    def filter_orders(self, orders, oms_client, data_manager):
+        if not orders:
+            return None
+        # Equal weight: 10% of balance split across orders
+        budget = oms_client.balance["USDT"] * 0.1 / len(orders)
+        return [{**order, "value": budget} for order in orders]
+```
+
+### Example: Risk-Adjusted Sizing
+
+See `examples/position_manager.py` for a full reference implementation with:
+
+1. **Risk screening**: Uses 4h volatility to filter high-risk orders
+2. **Inverse-vol sizing**: Allocates more to lower-volatility assets
+3. **Budget enforcement**: Ensures orders don't exceed available balance
+4. **CLOSE order handling**: Always allows position exits
+
+### Order Schema
+
+Orders returned from `filter_orders` should have:
+
+```python
+{
+    "symbol": "BTC-USDT",           # Asset symbol
+    "instrument_type": "future",    # "spot" or "future"
+    "side": "LONG",                 # "LONG", "SHORT", or "CLOSE"
+    "value": 1000.0                 # USDT notional (required!)
+}
+```
