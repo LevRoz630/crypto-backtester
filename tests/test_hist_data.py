@@ -886,9 +886,7 @@ class TestErrorHandling:
 
             # Mock network calls to prevent API access
             with patch.object(collector, "collect_spot_ohlcv", return_value=test_data):
-                result = collector.load_data_period(
-                    "BTC-USDT", "1h", "ohlcv_spot", start, end
-                )
+                result = collector.load_data_period("BTC-USDT", "1h", "ohlcv_spot", start, end)
 
             # Should still work with aligned boundaries
             assert result is not None
