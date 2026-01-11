@@ -1,12 +1,12 @@
-import os 
-from re import L
-from typing import List, Dict, Any
 import logging
-from datetime import timedelta, timezone, datetime
-from hist_data import HistoricalDataCollector
+from datetime import timedelta
+from typing import Any
+
 import numpy as np
+from hist_data import HistoricalDataCollector
 
 logger = logging.getLogger(__name__)
+
 
 class PositionManager:
     def __init__(self):
@@ -14,8 +14,9 @@ class PositionManager:
         self.oms_client = None
         self.data_manager = None
 
-
-    def filter_orders(self, orders: List[Dict[str, Any]], oms_client: Any, data_manager: HistoricalDataCollector):
+    def filter_orders(
+        self, orders: list[dict[str, Any]], oms_client: Any, data_manager: HistoricalDataCollector
+    ):
         """
         Pipeline to validate and weight raw strategy orders before sending to OMS.
 
@@ -30,17 +31,19 @@ class PositionManager:
         self.data_manager = data_manager
         try:
             # Separate CLOSE orders to bypass sizing/budget gating
-            close_orders = [o for o in orders if o.get('side') == 'CLOSE']
-            open_orders = [o for o in orders if o.get('side') != 'CLOSE']
+            close_orders = [o for o in orders if o.get("side") == "CLOSE"]
+            open_orders = [o for o in orders if o.get("side") != "CLOSE"]
 
             cleaned_open = self._close_risky_orders(open_orders)
             weighted_open = self._set_weights(cleaned_open)
 
             # Enforce balance constraint only on opens
             if weighted_open is not None:
-                values = [x.get('value', 0.0) for x in weighted_open]
-                if sum(values) > oms_client.balance['USDT']:
-                    logger.error(f"Insufficient USDT balance. Required: {values}, Available: {oms_client.balance['USDT']}")
+                values = [x.get("value", 0.0) for x in weighted_open]
+                if sum(values) > oms_client.balance["USDT"]:
+                    logger.error(
+                        f"Insufficient USDT balance. Required: {values}, Available: {oms_client.balance['USDT']}"
+                    )
                     return close_orders if close_orders else None
                 return close_orders + weighted_open
 
@@ -50,9 +53,8 @@ class PositionManager:
         except Exception as e:
             logger.error(f"Error filtering orders: {e}")
             return None
-        
 
-    def _close_risky_orders(self, orders: List[Dict[str, Any]]):
+    def _close_risky_orders(self, orders: list[dict[str, Any]]):
         """
         Mark orders as value=0 when recent realized vol is above a threshold.
 
@@ -60,25 +62,25 @@ class PositionManager:
           (std/mean). Current threshold: 0.1.
         - Futures data is stored under base symbols; '-PERP' suffix is removed.
         """
-        cleaned: List[Dict[str, Any]] = []
+        cleaned: list[dict[str, Any]] = []
         for order in orders:
             try:
-                base_symbol = order['symbol'].replace('-PERP', '')
+                base_symbol = order["symbol"].replace("-PERP", "")
                 data = self.data_manager.load_data_period(
                     base_symbol,
-                    '15m',
-                    'mark_ohlcv_futures',
+                    "15m",
+                    "mark_ohlcv_futures",
                     self.oms_client.current_time - timedelta(hours=4),
                     self.oms_client.current_time,
                 )
-                
+
                 if data is None or len(data) == 0:
                     cleaned.append(order)
                     continue
-                scaled_vol = float(np.std(data['close']) / np.mean(data['close']))
+                scaled_vol = float(np.std(data["close"]) / np.mean(data["close"]))
                 if scaled_vol > 0.1:
                     # Flag as do-not-trade by setting value 0
-                    new_order = {**order, 'value': 0}
+                    new_order = {**order, "value": 0}
                     cleaned.append(new_order)
                 else:
                     cleaned.append(order)
@@ -88,53 +90,52 @@ class PositionManager:
 
         return cleaned
 
+    def _set_weights(self, orders: list[dict[str, Any]]):
+        """
+        Size orders by inverse volatility under a budget cap.
 
-    def _set_weights(self, orders: List[Dict[str, Any]]):
-            """
-            Size orders by inverse volatility under a budget cap.
+        - Budget: 10% of current USDT balance (conservative sizing).
+        - For each non-zero order, compute 1/scaled_vol over last 1 day of 15m data.
+        - Allocate proportionally to inverse-vol weights.
+        """
+        # Work on a copy to avoid mutating the input list unexpectedly
+        updated: list[dict[str, Any]] = []
+        limit = self.oms_client.balance["USDT"] / 10
 
-            - Budget: 10% of current USDT balance (conservative sizing).
-            - For each non-zero order, compute 1/scaled_vol over last 1 day of 15m data.
-            - Allocate proportionally to inverse-vol weights.
-            """
-            # Work on a copy to avoid mutating the input list unexpectedly
-            updated: List[Dict[str, Any]] = []
-            limit = self.oms_client.balance['USDT'] / 10
-
-            # Compute inverse-vol weights for non-zero orders
-            inv_vols = []
-            for order in orders:
-                if order.get('value', None) == 0:
+        # Compute inverse-vol weights for non-zero orders
+        inv_vols = []
+        for order in orders:
+            if order.get("value", None) == 0:
+                inv_vols.append(0.0)
+                continue
+            try:
+                base_symbol = order["symbol"].replace("-PERP", "")
+                data = self.data_manager.load_data_period(
+                    base_symbol,
+                    "15m",
+                    "mark_ohlcv_futures",
+                    self.oms_client.current_time - timedelta(days=1),
+                    self.oms_client.current_time,
+                )
+                if data is None or len(data) == 0:
                     inv_vols.append(0.0)
                     continue
-                try:
-                    base_symbol = order['symbol'].replace('-PERP', '')
-                    data = self.data_manager.load_data_period(
-                        base_symbol,
-                        '15m',
-                        'mark_ohlcv_futures',
-                        self.oms_client.current_time - timedelta(days=1),
-                        self.oms_client.current_time,
-                    )
-                    if data is None or len(data) == 0:
-                        inv_vols.append(0.0)
-                        continue
-                    scaled_vol = float(np.std(data['close']) / np.mean(data['close']))
-                    inv_vols.append(0.0 if scaled_vol <= 0 else 1.0 / scaled_vol)
-                except Exception:
-                    inv_vols.append(0.0)
+                scaled_vol = float(np.std(data["close"]) / np.mean(data["close"]))
+                inv_vols.append(0.0 if scaled_vol <= 0 else 1.0 / scaled_vol)
+            except Exception:
+                inv_vols.append(0.0)
 
-            total_inv = sum(inv_vols) if inv_vols else 0.0
+        total_inv = sum(inv_vols) if inv_vols else 0.0
 
-            for idx, order in enumerate(orders):
-                try:
-                    if order.get('value', None) == 0:
-                        updated.append(order)
-                        continue
-                    weight = (inv_vols[idx] / total_inv) if total_inv > 0 else 0.0
-                    updated.append({**order, 'value': limit * weight})
-                except Exception as e:
-                    logger.error(f"Error setting weights: {e} for {order['symbol']}")
+        for idx, order in enumerate(orders):
+            try:
+                if order.get("value", None) == 0:
                     updated.append(order)
+                    continue
+                weight = (inv_vols[idx] / total_inv) if total_inv > 0 else 0.0
+                updated.append({**order, "value": limit * weight})
+            except Exception as e:
+                logger.error(f"Error setting weights: {e} for {order['symbol']}")
+                updated.append(order)
 
-            return updated
+        return updated

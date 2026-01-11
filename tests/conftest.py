@@ -18,9 +18,10 @@ def reset_logging():
     duplicate log messages and memory leaks in long test runs.
     """
     import logging
+
     yield
     # Clean up any handlers that might have been added
-    logger = logging.getLogger('crypto_backtester_binance.hist_data')
+    logger = logging.getLogger("crypto_backtester_binance.hist_data")
     logger.handlers.clear()
 
 
@@ -35,12 +36,6 @@ def pytest_configure(config):
 
     Usage: pytest -m "unit" to run only unit tests
     """
-    config.addinivalue_line(
-        "markers", "unit: mark test as a unit test"
-    )
-    config.addinivalue_line(
-        "markers", "integration: mark test as an integration test"
-    )
-    config.addinivalue_line(
-        "markers", "slow: mark test as slow running"
-    )
+    config.addinivalue_line("markers", "unit: mark test as a unit test")
+    config.addinivalue_line("markers", "integration: mark test as an integration test")
+    config.addinivalue_line("markers", "slow: mark test as slow running")

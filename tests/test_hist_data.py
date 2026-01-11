@@ -6,13 +6,13 @@ collection functionality, including OHLCV data, funding rates, open interest,
 and caching mechanisms.
 """
 
-import pytest
-import pandas as pd
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, call
 import tempfile
-import shutil
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from unittest.mock import Mock, patch
+
+import pandas as pd
+import pytest
 
 from crypto_backtester_binance.hist_data import HistoricalDataCollector
 
@@ -67,12 +67,12 @@ class TestHistoricalDataCollectorInit:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
             expected_kinds = [
-                'ohlcv_spot',
-                'mark_ohlcv_futures',
-                'index_ohlcv_futures',
-                'funding_rates',
-                'open_interest',
-                'trades_futures'
+                "ohlcv_spot",
+                "mark_ohlcv_futures",
+                "index_ohlcv_futures",
+                "funding_rates",
+                "open_interest",
+                "trades_futures",
             ]
 
             for kind in expected_kinds:
@@ -88,10 +88,13 @@ class TestCacheUtilities:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
             # Create test cache files
-            test_file = collector.data_dir / "spot_BTC_USDT_ohlcv_1h_20240101_000000_20240102_000000.parquet"
+            test_file = (
+                collector.data_dir
+                / "spot_BTC_USDT_ohlcv_1h_20240101_000000_20240102_000000.parquet"
+            )
             test_file.touch()
 
-            files = collector._cache_glob('ohlcv_spot', 'BTC-USDT', '1h')
+            files = collector._cache_glob("ohlcv_spot", "BTC-USDT", "1h")
             assert len(files) == 1
             assert files[0] == test_file
 
@@ -103,7 +106,7 @@ class TestCacheUtilities:
             test_file = collector.data_dir / "perpetual_ETH_USDT_mark_15m_20240101_20240102.parquet"
             test_file.touch()
 
-            files = collector._cache_glob('mark_ohlcv_futures', 'ETH-USDT', '15m')
+            files = collector._cache_glob("mark_ohlcv_futures", "ETH-USDT", "15m")
             assert len(files) == 1
 
     def test_cache_glob_funding_rates(self):
@@ -111,10 +114,13 @@ class TestCacheUtilities:
         with tempfile.TemporaryDirectory() as tmpdir:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
-            test_file = collector.data_dir / "perpetual_BTC_USDT_funding_rates_20240101_000000_20240102_000000.parquet"
+            test_file = (
+                collector.data_dir
+                / "perpetual_BTC_USDT_funding_rates_20240101_000000_20240102_000000.parquet"
+            )
             test_file.touch()
 
-            files = collector._cache_glob('funding_rates', 'BTC-USDT', None)
+            files = collector._cache_glob("funding_rates", "BTC-USDT", None)
             assert len(files) == 1
 
     def test_cache_glob_no_matches(self):
@@ -122,7 +128,7 @@ class TestCacheUtilities:
         with tempfile.TemporaryDirectory() as tmpdir:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
-            files = collector._cache_glob('ohlcv_spot', 'BTC-USDT', '1h')
+            files = collector._cache_glob("ohlcv_spot", "BTC-USDT", "1h")
             assert len(files) == 0
 
 
@@ -134,10 +140,10 @@ class TestLoadCachedWindow:
         with tempfile.TemporaryDirectory() as tmpdir:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
-            start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+            start = datetime(2024, 1, 1, tzinfo=UTC)
+            end = datetime(2024, 1, 2, tzinfo=UTC)
 
-            result = collector.load_cached_window('ohlcv_spot', 'BTC-USDT', start, end, '1h')
+            result = collector.load_cached_window("ohlcv_spot", "BTC-USDT", start, end, "1h")
             assert result is None
 
     def test_load_cached_window_with_valid_data(self):
@@ -146,27 +152,32 @@ class TestLoadCachedWindow:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
             # Create test data
-            start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+            start = datetime(2024, 1, 1, tzinfo=UTC)
+            end = datetime(2024, 1, 2, tzinfo=UTC)
 
-            test_data = pd.DataFrame({
-                'timestamp': pd.date_range(start, end, freq='1h', tz='UTC'),
-                'open': [100.0] * 25,
-                'high': [105.0] * 25,
-                'low': [95.0] * 25,
-                'close': [102.0] * 25,
-                'volume': [1000.0] * 25
-            })
+            test_data = pd.DataFrame(
+                {
+                    "timestamp": pd.date_range(start, end, freq="1h", tz="UTC"),
+                    "open": [100.0] * 25,
+                    "high": [105.0] * 25,
+                    "low": [95.0] * 25,
+                    "close": [102.0] * 25,
+                    "volume": [1000.0] * 25,
+                }
+            )
 
-            cache_file = collector.data_dir / "spot_BTC_USDT_ohlcv_1h_20240101_000000_20240102_000000.parquet"
+            cache_file = (
+                collector.data_dir
+                / "spot_BTC_USDT_ohlcv_1h_20240101_000000_20240102_000000.parquet"
+            )
             test_data.to_parquet(cache_file)
 
-            result = collector.load_cached_window('ohlcv_spot', 'BTC-USDT', start, end, '1h')
+            result = collector.load_cached_window("ohlcv_spot", "BTC-USDT", start, end, "1h")
 
             assert result is not None
             assert not result.empty
             assert len(result) == 25
-            assert 'timestamp' in result.columns
+            assert "timestamp" in result.columns
 
     def test_load_cached_window_filters_by_date_range(self):
         """Test that cached data is properly filtered by date range."""
@@ -174,67 +185,88 @@ class TestLoadCachedWindow:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
             # Create test data spanning larger range
-            full_start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            full_end = datetime(2024, 1, 10, tzinfo=timezone.utc)
+            full_start = datetime(2024, 1, 1, tzinfo=UTC)
+            full_end = datetime(2024, 1, 10, tzinfo=UTC)
 
-            test_data = pd.DataFrame({
-                'timestamp': pd.date_range(full_start, full_end, freq='1h', tz='UTC'),
-                'open': [100.0] * 217,
-                'close': [102.0] * 217
-            })
+            test_data = pd.DataFrame(
+                {
+                    "timestamp": pd.date_range(full_start, full_end, freq="1h", tz="UTC"),
+                    "open": [100.0] * 217,
+                    "close": [102.0] * 217,
+                }
+            )
 
-            cache_file = collector.data_dir / "spot_BTC_USDT_ohlcv_1h_20240101_000000_20240110_000000.parquet"
+            cache_file = (
+                collector.data_dir
+                / "spot_BTC_USDT_ohlcv_1h_20240101_000000_20240110_000000.parquet"
+            )
             test_data.to_parquet(cache_file)
 
             # Request smaller window
-            request_start = datetime(2024, 1, 3, tzinfo=timezone.utc)
-            request_end = datetime(2024, 1, 5, tzinfo=timezone.utc)
+            request_start = datetime(2024, 1, 3, tzinfo=UTC)
+            request_end = datetime(2024, 1, 5, tzinfo=UTC)
 
-            result = collector.load_cached_window('ohlcv_spot', 'BTC-USDT', request_start, request_end, '1h')
+            result = collector.load_cached_window(
+                "ohlcv_spot", "BTC-USDT", request_start, request_end, "1h"
+            )
 
             assert result is not None
-            assert result['timestamp'].min() >= pd.Timestamp(request_start)
-            assert result['timestamp'].max() <= pd.Timestamp(request_end)
+            assert result["timestamp"].min() >= pd.Timestamp(request_start)
+            assert result["timestamp"].max() <= pd.Timestamp(request_end)
 
     def test_load_cached_window_handles_timezone_aware_data(self):
         """Test that cached data with timezones is handled correctly."""
         with tempfile.TemporaryDirectory() as tmpdir:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
-            start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+            start = datetime(2024, 1, 1, tzinfo=UTC)
+            end = datetime(2024, 1, 2, tzinfo=UTC)
 
-            test_data = pd.DataFrame({
-                'timestamp': pd.date_range(start, end, freq='1h', tz='UTC'),
-                'open': [100.0] * 25
-            })
+            test_data = pd.DataFrame(
+                {"timestamp": pd.date_range(start, end, freq="1h", tz="UTC"), "open": [100.0] * 25}
+            )
 
-            cache_file = collector.data_dir / "spot_BTC_USDT_ohlcv_1h_20240101_000000_20240102_000000.parquet"
+            cache_file = (
+                collector.data_dir
+                / "spot_BTC_USDT_ohlcv_1h_20240101_000000_20240102_000000.parquet"
+            )
             test_data.to_parquet(cache_file)
 
-            result = collector.load_cached_window('ohlcv_spot', 'BTC-USDT', start, end, '1h')
+            result = collector.load_cached_window("ohlcv_spot", "BTC-USDT", start, end, "1h")
 
             assert result is not None
-            assert result['timestamp'].dt.tz is not None
+            assert result["timestamp"].dt.tz is not None
 
     def test_load_cached_window_removes_duplicates(self):
         """Test that duplicate timestamps are removed."""
         with tempfile.TemporaryDirectory() as tmpdir:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
-            start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+            start = datetime(2024, 1, 1, tzinfo=UTC)
 
             # Create data with duplicates
-            timestamps = [start, start + timedelta(hours=1), start + timedelta(hours=1), start + timedelta(hours=2)]
-            test_data = pd.DataFrame({
-                'timestamp': pd.to_datetime(timestamps, utc=True),
-                'open': [100.0, 101.0, 101.5, 102.0]
-            })
+            timestamps = [
+                start,
+                start + timedelta(hours=1),
+                start + timedelta(hours=1),
+                start + timedelta(hours=2),
+            ]
+            test_data = pd.DataFrame(
+                {
+                    "timestamp": pd.to_datetime(timestamps, utc=True),
+                    "open": [100.0, 101.0, 101.5, 102.0],
+                }
+            )
 
-            cache_file = collector.data_dir / "spot_BTC_USDT_ohlcv_1h_20240101_000000_20240102_000000.parquet"
+            cache_file = (
+                collector.data_dir
+                / "spot_BTC_USDT_ohlcv_1h_20240101_000000_20240102_000000.parquet"
+            )
             test_data.to_parquet(cache_file)
 
-            result = collector.load_cached_window('ohlcv_spot', 'BTC-USDT', start, start + timedelta(hours=3), '1h')
+            result = collector.load_cached_window(
+                "ohlcv_spot", "BTC-USDT", start, start + timedelta(hours=3), "1h"
+            )
 
             assert result is not None
             assert len(result) == 3  # Duplicates should be removed
@@ -248,17 +280,16 @@ class TestLoadFromClass:
         with tempfile.TemporaryDirectory() as tmpdir:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
-            start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+            start = datetime(2024, 1, 1, tzinfo=UTC)
+            end = datetime(2024, 1, 2, tzinfo=UTC)
 
             # Store test data
-            test_data = pd.DataFrame({
-                'timestamp': pd.date_range(start, end, freq='1h', tz='UTC'),
-                'open': [100.0] * 25
-            })
-            collector.spot_ohlcv_data['BTC-USDT'] = test_data
+            test_data = pd.DataFrame(
+                {"timestamp": pd.date_range(start, end, freq="1h", tz="UTC"), "open": [100.0] * 25}
+            )
+            collector.spot_ohlcv_data["BTC-USDT"] = test_data
 
-            result = collector.load_from_class('ohlcv_spot', 'BTC-USDT', start, end)
+            result = collector.load_from_class("ohlcv_spot", "BTC-USDT", start, end)
 
             assert result is not None
             assert not result.empty
@@ -269,17 +300,14 @@ class TestLoadFromClass:
         with tempfile.TemporaryDirectory() as tmpdir:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
-            start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+            start = datetime(2024, 1, 1, tzinfo=UTC)
+            end = datetime(2024, 1, 2, tzinfo=UTC)
 
-            timestamps = pd.date_range(start, end, freq='15min', tz='UTC')
-            test_data = pd.DataFrame({
-                'timestamp': timestamps,
-                'open': [100.0] * len(timestamps)
-            })
-            collector.perpetual_mark_ohlcv_data['ETH-USDT'] = test_data
+            timestamps = pd.date_range(start, end, freq="15min", tz="UTC")
+            test_data = pd.DataFrame({"timestamp": timestamps, "open": [100.0] * len(timestamps)})
+            collector.perpetual_mark_ohlcv_data["ETH-USDT"] = test_data
 
-            result = collector.load_from_class('mark_ohlcv_futures', 'ETH-USDT', start, end)
+            result = collector.load_from_class("mark_ohlcv_futures", "ETH-USDT", start, end)
 
             assert result is not None
             pd.testing.assert_frame_equal(result, test_data)
@@ -289,10 +317,10 @@ class TestLoadFromClass:
         with tempfile.TemporaryDirectory() as tmpdir:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
-            start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+            start = datetime(2024, 1, 1, tzinfo=UTC)
+            end = datetime(2024, 1, 2, tzinfo=UTC)
 
-            result = collector.load_from_class('ohlcv_spot', 'BTC-USDT', start, end)
+            result = collector.load_from_class("ohlcv_spot", "BTC-USDT", start, end)
 
             assert result is None
 
@@ -301,17 +329,17 @@ class TestLoadFromClass:
         with tempfile.TemporaryDirectory() as tmpdir:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
-            start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+            start = datetime(2024, 1, 1, tzinfo=UTC)
+            end = datetime(2024, 1, 2, tzinfo=UTC)
 
             with pytest.raises(ValueError, match="Invalid kind"):
-                collector.load_from_class('invalid_kind', 'BTC-USDT', start, end)
+                collector.load_from_class("invalid_kind", "BTC-USDT", start, end)
 
 
 class TestCollectSpotOHLCV:
     """Tests for collect_spot_ohlcv method."""
 
-    @patch('crypto_backtester_binance.hist_data.HistoricalDataCollector._loop_data_collection')
+    @patch("crypto_backtester_binance.hist_data.HistoricalDataCollector._loop_data_collection")
     def test_collect_spot_ohlcv_success(self, mock_loop):
         """Test successful collection of spot OHLCV data."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -324,20 +352,20 @@ class TestCollectSpotOHLCV:
             ]
             mock_loop.return_value = mock_data
 
-            start_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            result = collector.collect_spot_ohlcv('BTC-USDT', '1h', start_time, export=False)
+            start_time = datetime(2024, 1, 1, tzinfo=UTC)
+            result = collector.collect_spot_ohlcv("BTC-USDT", "1h", start_time, export=False)
 
             assert result is not None
             assert isinstance(result, pd.DataFrame)
             assert len(result) == 2
-            assert 'timestamp' in result.columns
-            assert 'open' in result.columns
-            assert 'high' in result.columns
-            assert 'low' in result.columns
-            assert 'close' in result.columns
-            assert 'volume' in result.columns
-            assert result['symbol'].iloc[0] == 'BTC-USDT'
-            assert result['market_type'].iloc[0] == 'spot'
+            assert "timestamp" in result.columns
+            assert "open" in result.columns
+            assert "high" in result.columns
+            assert "low" in result.columns
+            assert "close" in result.columns
+            assert "volume" in result.columns
+            assert result["symbol"].iloc[0] == "BTC-USDT"
+            assert result["market_type"].iloc[0] == "spot"
 
     def test_collect_spot_ohlcv_requires_start_time(self):
         """Test that start_time parameter is required."""
@@ -345,9 +373,9 @@ class TestCollectSpotOHLCV:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
             with pytest.raises(ValueError, match="Start time is required"):
-                collector.collect_spot_ohlcv('BTC-USDT', '1h', start_time=None)
+                collector.collect_spot_ohlcv("BTC-USDT", "1h", start_time=None)
 
-    @patch('crypto_backtester_binance.hist_data.HistoricalDataCollector._loop_data_collection')
+    @patch("crypto_backtester_binance.hist_data.HistoricalDataCollector._loop_data_collection")
     def test_collect_spot_ohlcv_export(self, mock_loop):
         """Test that export parameter saves data to file."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -356,14 +384,14 @@ class TestCollectSpotOHLCV:
             mock_data = [[1704067200000, 100.0, 105.0, 95.0, 102.0, 1000.0]]
             mock_loop.return_value = mock_data
 
-            start_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            result = collector.collect_spot_ohlcv('BTC-USDT', '1h', start_time, export=True)
+            start_time = datetime(2024, 1, 1, tzinfo=UTC)
+            _result = collector.collect_spot_ohlcv("BTC-USDT", "1h", start_time, export=True)
 
             # Check that file was created
             cache_files = list(collector.data_dir.glob("spot_BTC_USDT_ohlcv_1h_*.parquet"))
             assert len(cache_files) == 1
 
-    @patch('crypto_backtester_binance.hist_data.HistoricalDataCollector._loop_data_collection')
+    @patch("crypto_backtester_binance.hist_data.HistoricalDataCollector._loop_data_collection")
     def test_collect_spot_ohlcv_stores_in_class(self, mock_loop):
         """Test that collected data is stored in class dictionary."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -372,13 +400,13 @@ class TestCollectSpotOHLCV:
             mock_data = [[1704067200000, 100.0, 105.0, 95.0, 102.0, 1000.0]]
             mock_loop.return_value = mock_data
 
-            start_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            collector.collect_spot_ohlcv('BTC-USDT', '1h', start_time, export=False)
+            start_time = datetime(2024, 1, 1, tzinfo=UTC)
+            collector.collect_spot_ohlcv("BTC-USDT", "1h", start_time, export=False)
 
-            assert 'BTC-USDT' in collector.spot_ohlcv_data
-            assert len(collector.spot_ohlcv_data['BTC-USDT']) == 1
+            assert "BTC-USDT" in collector.spot_ohlcv_data
+            assert len(collector.spot_ohlcv_data["BTC-USDT"]) == 1
 
-    @patch('crypto_backtester_binance.hist_data.HistoricalDataCollector._loop_data_collection')
+    @patch("crypto_backtester_binance.hist_data.HistoricalDataCollector._loop_data_collection")
     def test_collect_spot_ohlcv_no_data(self, mock_loop):
         """Test handling when no data is returned."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -386,8 +414,8 @@ class TestCollectSpotOHLCV:
 
             mock_loop.return_value = []
 
-            start_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            result = collector.collect_spot_ohlcv('BTC-USDT', '1h', start_time, export=False)
+            start_time = datetime(2024, 1, 1, tzinfo=UTC)
+            result = collector.collect_spot_ohlcv("BTC-USDT", "1h", start_time, export=False)
 
             assert result is None
 
@@ -395,7 +423,7 @@ class TestCollectSpotOHLCV:
 class TestCollectPerpetualMarkOHLCV:
     """Tests for collect_perpetual_mark_ohlcv method."""
 
-    @patch('crypto_backtester_binance.hist_data.HistoricalDataCollector._loop_data_collection')
+    @patch("crypto_backtester_binance.hist_data.HistoricalDataCollector._loop_data_collection")
     def test_collect_perpetual_mark_ohlcv_success(self, mock_loop):
         """Test successful collection of perpetual mark price OHLCV data."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -404,16 +432,18 @@ class TestCollectPerpetualMarkOHLCV:
             mock_data = [[1704067200000, 100.0, 105.0, 95.0, 102.0, 1000.0]]
             mock_loop.return_value = mock_data
 
-            start_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            result = collector.collect_perpetual_mark_ohlcv('BTC-USDT', '15m', start_time, export=False)
+            start_time = datetime(2024, 1, 1, tzinfo=UTC)
+            result = collector.collect_perpetual_mark_ohlcv(
+                "BTC-USDT", "15m", start_time, export=False
+            )
 
             assert result is not None
             assert isinstance(result, pd.DataFrame)
-            assert 'price_type' in result.columns
-            assert result['price_type'].iloc[0] == 'mark'
-            assert result['market_type'].iloc[0] == 'perpetual'
+            assert "price_type" in result.columns
+            assert result["price_type"].iloc[0] == "mark"
+            assert result["market_type"].iloc[0] == "perpetual"
 
-    @patch('crypto_backtester_binance.hist_data.HistoricalDataCollector._loop_data_collection')
+    @patch("crypto_backtester_binance.hist_data.HistoricalDataCollector._loop_data_collection")
     def test_collect_perpetual_mark_ohlcv_params(self, mock_loop):
         """Test that mark price parameter is passed correctly."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -422,18 +452,18 @@ class TestCollectPerpetualMarkOHLCV:
             mock_data = [[1704067200000, 100.0, 105.0, 95.0, 102.0, 1000.0]]
             mock_loop.return_value = mock_data
 
-            start_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            collector.collect_perpetual_mark_ohlcv('BTC-USDT', '15m', start_time, export=False)
+            start_time = datetime(2024, 1, 1, tzinfo=UTC)
+            collector.collect_perpetual_mark_ohlcv("BTC-USDT", "15m", start_time, export=False)
 
             # Verify params were passed
             call_args = mock_loop.call_args
-            assert call_args[1]['params'] == {'price': 'mark'}
+            assert call_args[1]["params"] == {"price": "mark"}
 
 
 class TestCollectPerpetualIndexOHLCV:
     """Tests for collect_perpetual_index_ohlcv method."""
 
-    @patch('crypto_backtester_binance.hist_data.HistoricalDataCollector._loop_data_collection')
+    @patch("crypto_backtester_binance.hist_data.HistoricalDataCollector._loop_data_collection")
     def test_collect_perpetual_index_ohlcv_success(self, mock_loop):
         """Test successful collection of perpetual index price OHLCV data."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -442,16 +472,18 @@ class TestCollectPerpetualIndexOHLCV:
             mock_data = [[1704067200000, 100.0, 105.0, 95.0, 102.0, 1000.0]]
             mock_loop.return_value = mock_data
 
-            start_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            result = collector.collect_perpetual_index_ohlcv('BTC-USDT', '15m', start_time, export=False)
+            start_time = datetime(2024, 1, 1, tzinfo=UTC)
+            result = collector.collect_perpetual_index_ohlcv(
+                "BTC-USDT", "15m", start_time, export=False
+            )
 
             assert result is not None
             assert isinstance(result, pd.DataFrame)
-            assert 'price_type' in result.columns
-            assert result['price_type'].iloc[0] == 'index'
-            assert result['market_type'].iloc[0] == 'perpetual'
+            assert "price_type" in result.columns
+            assert result["price_type"].iloc[0] == "index"
+            assert result["market_type"].iloc[0] == "perpetual"
 
-    @patch('crypto_backtester_binance.hist_data.HistoricalDataCollector._loop_data_collection')
+    @patch("crypto_backtester_binance.hist_data.HistoricalDataCollector._loop_data_collection")
     def test_collect_perpetual_index_ohlcv_params(self, mock_loop):
         """Test that index price parameter is passed correctly."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -460,12 +492,12 @@ class TestCollectPerpetualIndexOHLCV:
             mock_data = [[1704067200000, 100.0, 105.0, 95.0, 102.0, 1000.0]]
             mock_loop.return_value = mock_data
 
-            start_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            collector.collect_perpetual_index_ohlcv('BTC-USDT', '15m', start_time, export=False)
+            start_time = datetime(2024, 1, 1, tzinfo=UTC)
+            collector.collect_perpetual_index_ohlcv("BTC-USDT", "15m", start_time, export=False)
 
             # Verify params were passed
             call_args = mock_loop.call_args
-            assert call_args[1]['params'] == {'price': 'index'}
+            assert call_args[1]["params"] == {"price": "index"}
 
 
 class TestCollectFundingRates:
@@ -477,7 +509,7 @@ class TestCollectFundingRates:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
             with pytest.raises(ValueError, match="Start time is required"):
-                collector.collect_funding_rates('BTC-USDT', start_time=None)
+                collector.collect_funding_rates("BTC-USDT", start_time=None)
 
     def test_collect_funding_rates_success(self):
         """Test successful collection of funding rates."""
@@ -486,25 +518,25 @@ class TestCollectFundingRates:
 
             mock_data = [
                 {
-                    'timestamp': 1704067200000,
-                    'fundingRate': 0.0001,
-                    'fundingTime': 1704067200000,
-                    'markPrice': '42000.0',
-                    'indexPrice': '41995.0',
-                    'info': {}
+                    "timestamp": 1704067200000,
+                    "fundingRate": 0.0001,
+                    "fundingTime": 1704067200000,
+                    "markPrice": "42000.0",
+                    "indexPrice": "41995.0",
+                    "info": {},
                 }
             ]
             collector.futures_exchange.fetch_funding_rate_history = Mock(return_value=mock_data)
 
-            start_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            result = collector.collect_funding_rates('BTC-USDT', start_time, export=False)
+            start_time = datetime(2024, 1, 1, tzinfo=UTC)
+            result = collector.collect_funding_rates("BTC-USDT", start_time, export=False)
 
             assert result is not None
             assert isinstance(result, pd.DataFrame)
-            assert 'funding_rate' in result.columns
-            assert 'mark_price' in result.columns
-            assert 'index_price' in result.columns
-            assert result['market_type'].iloc[0] == 'perpetual'
+            assert "funding_rate" in result.columns
+            assert "mark_price" in result.columns
+            assert "index_price" in result.columns
+            assert result["market_type"].iloc[0] == "perpetual"
 
     def test_collect_funding_rates_handles_exception(self):
         """Test handling of exceptions during funding rate collection."""
@@ -514,8 +546,8 @@ class TestCollectFundingRates:
             mock_fetch = Mock(side_effect=Exception("API Error"))
             collector.futures_exchange.fetch_funding_rate_history = mock_fetch
 
-            start_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            result = collector.collect_funding_rates('BTC-USDT', start_time, export=False)
+            start_time = datetime(2024, 1, 1, tzinfo=UTC)
+            result = collector.collect_funding_rates("BTC-USDT", start_time, export=False)
 
             assert result is None
 
@@ -523,7 +555,7 @@ class TestCollectFundingRates:
 class TestCollectOpenInterest:
     """Tests for collect_open_interest method."""
 
-    @patch('crypto_backtester_binance.hist_data.HistoricalDataCollector._loop_data_collection')
+    @patch("crypto_backtester_binance.hist_data.HistoricalDataCollector._loop_data_collection")
     def test_collect_open_interest_success(self, mock_loop):
         """Test successful collection of open interest data."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -531,22 +563,22 @@ class TestCollectOpenInterest:
 
             mock_data = [
                 {
-                    'timestamp': 1704067200000,
-                    'openInterestAmount': 1000.0,
-                    'openInterestValue': 42000000.0,
-                    'contractType': 'perpetual'
+                    "timestamp": 1704067200000,
+                    "openInterestAmount": 1000.0,
+                    "openInterestValue": 42000000.0,
+                    "contractType": "perpetual",
                 }
             ]
             mock_loop.return_value = mock_data
 
-            start_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            result = collector.collect_open_interest('BTC-USDT', '15m', start_time, export=False)
+            start_time = datetime(2024, 1, 1, tzinfo=UTC)
+            result = collector.collect_open_interest("BTC-USDT", "15m", start_time, export=False)
 
             assert result is not None
             assert isinstance(result, pd.DataFrame)
-            assert 'open_interest' in result.columns
-            assert 'open_interest_value' in result.columns
-            assert result['market_type'].iloc[0] == 'perpetual'
+            assert "open_interest" in result.columns
+            assert "open_interest_value" in result.columns
+            assert result["market_type"].iloc[0] == "perpetual"
 
     def test_collect_open_interest_requires_start_time(self):
         """Test that start_time parameter is required."""
@@ -554,7 +586,7 @@ class TestCollectOpenInterest:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
             with pytest.raises(ValueError, match="Start time is required"):
-                collector.collect_open_interest('BTC-USDT', '15m', start_time=None)
+                collector.collect_open_interest("BTC-USDT", "15m", start_time=None)
 
 
 class TestCollectPerpetualTrades:
@@ -566,7 +598,7 @@ class TestCollectPerpetualTrades:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
             with pytest.raises(ValueError, match="Start time is required"):
-                collector.collect_perpetual_trades('BTC-USDT', start_time=None)
+                collector.collect_perpetual_trades("BTC-USDT", start_time=None)
 
     def test_collect_perpetual_trades_success(self):
         """Test successful collection of perpetual trades."""
@@ -575,27 +607,27 @@ class TestCollectPerpetualTrades:
 
             mock_data = [
                 {
-                    'timestamp': 1704067200000,
-                    'id': '123456',
-                    'side': 'buy',
-                    'price': 42000.0,
-                    'amount': 0.5,
-                    'cost': 21000.0,
-                    'takerOrMaker': 'taker'
+                    "timestamp": 1704067200000,
+                    "id": "123456",
+                    "side": "buy",
+                    "price": 42000.0,
+                    "amount": 0.5,
+                    "cost": 21000.0,
+                    "takerOrMaker": "taker",
                 }
             ]
             # Return data first time, empty list second time to exit loop
             collector.futures_exchange.fetch_trades = Mock(side_effect=[mock_data, []])
 
-            start_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
+            start_time = datetime(2024, 1, 1, tzinfo=UTC)
             # Set end_time very close to start_time to avoid infinite loop
-            result = collector.collect_perpetual_trades('BTC-USDT', start_time, export=False)
+            result = collector.collect_perpetual_trades("BTC-USDT", start_time, export=False)
 
             assert result is not None
             assert isinstance(result, pd.DataFrame)
-            assert 'side' in result.columns
-            assert 'price' in result.columns
-            assert 'amount' in result.columns
+            assert "side" in result.columns
+            assert "price" in result.columns
+            assert "amount" in result.columns
 
 
 class TestLoadDataPeriod:
@@ -607,89 +639,94 @@ class TestLoadDataPeriod:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
             with pytest.raises(ValueError, match="Start and end dates are required"):
-                collector.load_data_period('BTC-USDT', '1h', 'ohlcv_spot', None, None)
+                collector.load_data_period("BTC-USDT", "1h", "ohlcv_spot", None, None)
 
     def test_load_data_period_validates_date_order(self):
         """Test that start date must be before end date."""
         with tempfile.TemporaryDirectory() as tmpdir:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
-            start = datetime(2024, 1, 2, tzinfo=timezone.utc)
-            end = datetime(2024, 1, 1, tzinfo=timezone.utc)
+            start = datetime(2024, 1, 2, tzinfo=UTC)
+            end = datetime(2024, 1, 1, tzinfo=UTC)
 
             with pytest.raises(ValueError, match="Start date must be before end date"):
-                collector.load_data_period('BTC-USDT', '1h', 'ohlcv_spot', start, end)
+                collector.load_data_period("BTC-USDT", "1h", "ohlcv_spot", start, end)
 
     def test_load_data_period_validates_data_type(self):
         """Test that invalid data types are rejected."""
         with tempfile.TemporaryDirectory() as tmpdir:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
-            start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+            start = datetime(2024, 1, 1, tzinfo=UTC)
+            end = datetime(2024, 1, 2, tzinfo=UTC)
 
             with pytest.raises(ValueError, match="Invalid data type"):
-                collector.load_data_period('BTC-USDT', '1h', 'invalid_type', start, end)
+                collector.load_data_period("BTC-USDT", "1h", "invalid_type", start, end)
 
-    @patch('crypto_backtester_binance.hist_data.HistoricalDataCollector.collect_spot_ohlcv')
+    @patch("crypto_backtester_binance.hist_data.HistoricalDataCollector.collect_spot_ohlcv")
     def test_load_data_period_spot_ohlcv(self, mock_collect):
         """Test loading spot OHLCV data."""
         with tempfile.TemporaryDirectory() as tmpdir:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
-            start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+            start = datetime(2024, 1, 1, tzinfo=UTC)
+            end = datetime(2024, 1, 2, tzinfo=UTC)
 
-            test_data = pd.DataFrame({
-                'timestamp': pd.date_range(start, end, freq='1h', tz='UTC'),
-                'open': [100.0] * 25,
-                'close': [102.0] * 25
-            })
+            test_data = pd.DataFrame(
+                {
+                    "timestamp": pd.date_range(start, end, freq="1h", tz="UTC"),
+                    "open": [100.0] * 25,
+                    "close": [102.0] * 25,
+                }
+            )
             mock_collect.return_value = test_data
 
-            result = collector.load_data_period('BTC-USDT', '1h', 'ohlcv_spot', start, end)
+            result = collector.load_data_period("BTC-USDT", "1h", "ohlcv_spot", start, end)
 
             assert result is not None
             assert len(result) > 0
 
-    @patch('crypto_backtester_binance.hist_data.HistoricalDataCollector.collect_perpetual_mark_ohlcv')
+    @patch(
+        "crypto_backtester_binance.hist_data.HistoricalDataCollector.collect_perpetual_mark_ohlcv"
+    )
     def test_load_data_period_mark_ohlcv(self, mock_collect):
         """Test loading perpetual mark price data."""
         with tempfile.TemporaryDirectory() as tmpdir:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
-            start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+            start = datetime(2024, 1, 1, tzinfo=UTC)
+            end = datetime(2024, 1, 2, tzinfo=UTC)
 
-            timestamps = pd.date_range(start, end, freq='15min', tz='UTC')
-            test_data = pd.DataFrame({
-                'timestamp': timestamps,
-                'open': [100.0] * len(timestamps),
-                'close': [102.0] * len(timestamps)
-            })
+            timestamps = pd.date_range(start, end, freq="15min", tz="UTC")
+            test_data = pd.DataFrame(
+                {
+                    "timestamp": timestamps,
+                    "open": [100.0] * len(timestamps),
+                    "close": [102.0] * len(timestamps),
+                }
+            )
             mock_collect.return_value = test_data
 
-            result = collector.load_data_period('BTC-USDT', '15m', 'mark_ohlcv_futures', start, end)
+            result = collector.load_data_period("BTC-USDT", "15m", "mark_ohlcv_futures", start, end)
 
             assert result is not None
 
-    @patch('crypto_backtester_binance.hist_data.HistoricalDataCollector.collect_funding_rates')
+    @patch("crypto_backtester_binance.hist_data.HistoricalDataCollector.collect_funding_rates")
     def test_load_data_period_funding_rates(self, mock_collect):
         """Test loading funding rates data."""
         with tempfile.TemporaryDirectory() as tmpdir:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
-            start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+            start = datetime(2024, 1, 1, tzinfo=UTC)
+            end = datetime(2024, 1, 2, tzinfo=UTC)
 
-            timestamps = pd.date_range(start, end, freq='8h', tz='UTC')
-            test_data = pd.DataFrame({
-                'timestamp': timestamps,
-                'funding_rate': [0.0001] * len(timestamps)
-            })
+            timestamps = pd.date_range(start, end, freq="8h", tz="UTC")
+            test_data = pd.DataFrame(
+                {"timestamp": timestamps, "funding_rate": [0.0001] * len(timestamps)}
+            )
             mock_collect.return_value = test_data
 
-            result = collector.load_data_period('BTC-USDT', '1h', 'funding_rates', start, end)
+            result = collector.load_data_period("BTC-USDT", "1h", "funding_rates", start, end)
 
             assert result is not None
 
@@ -698,21 +735,28 @@ class TestLoadDataPeriod:
         with tempfile.TemporaryDirectory() as tmpdir:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
-            start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+            start = datetime(2024, 1, 1, tzinfo=UTC)
+            end = datetime(2024, 1, 2, tzinfo=UTC)
 
             # Create cached data
-            test_data = pd.DataFrame({
-                'timestamp': pd.date_range(start, end, freq='1h', tz='UTC'),
-                'open': [100.0] * 25,
-                'close': [102.0] * 25
-            })
-            cache_file = collector.data_dir / "spot_BTC_USDT_ohlcv_1h_20240101_000000_20240102_000000.parquet"
+            test_data = pd.DataFrame(
+                {
+                    "timestamp": pd.date_range(start, end, freq="1h", tz="UTC"),
+                    "open": [100.0] * 25,
+                    "close": [102.0] * 25,
+                }
+            )
+            cache_file = (
+                collector.data_dir
+                / "spot_BTC_USDT_ohlcv_1h_20240101_000000_20240102_000000.parquet"
+            )
             test_data.to_parquet(cache_file)
 
             # Mock collect methods to track if they're called
-            with patch.object(collector, 'collect_spot_ohlcv') as mock_collect:
-                result = collector.load_data_period('BTC-USDT', '1h', 'ohlcv_spot', start, end, load_from_class=False)
+            with patch.object(collector, "collect_spot_ohlcv") as mock_collect:
+                result = collector.load_data_period(
+                    "BTC-USDT", "1h", "ohlcv_spot", start, end, load_from_class=False
+                )
 
                 # Should use cache, not call collect
                 assert mock_collect.call_count == 0
@@ -723,20 +767,27 @@ class TestLoadDataPeriod:
         with tempfile.TemporaryDirectory() as tmpdir:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
-            start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+            start = datetime(2024, 1, 1, tzinfo=UTC)
+            end = datetime(2024, 1, 2, tzinfo=UTC)
 
-            test_data = pd.DataFrame({
-                'timestamp': pd.date_range(start, end, freq='1h', tz='UTC'),
-                'open': [100.0] * 25,
-                'close': [102.0] * 25
-            })
-            cache_file = collector.data_dir / "spot_BTC_USDT_ohlcv_1h_20240101_000000_20240102_000000.parquet"
+            test_data = pd.DataFrame(
+                {
+                    "timestamp": pd.date_range(start, end, freq="1h", tz="UTC"),
+                    "open": [100.0] * 25,
+                    "close": [102.0] * 25,
+                }
+            )
+            cache_file = (
+                collector.data_dir
+                / "spot_BTC_USDT_ohlcv_1h_20240101_000000_20240102_000000.parquet"
+            )
             test_data.to_parquet(cache_file)
 
-            result = collector.load_data_period('BTC-USDT', '1h', 'ohlcv_spot', start, end, save_to_class=True)
+            _result = collector.load_data_period(
+                "BTC-USDT", "1h", "ohlcv_spot", start, end, save_to_class=True
+            )
 
-            assert 'BTC-USDT' in collector.spot_ohlcv_data
+            assert "BTC-USDT" in collector.spot_ohlcv_data
 
 
 class TestLoopDataCollection:
@@ -747,20 +798,20 @@ class TestLoopDataCollection:
         with tempfile.TemporaryDirectory() as tmpdir:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
-            start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            end = datetime(2024, 1, 1, 2, tzinfo=timezone.utc)  # 2 hours
+            start = datetime(2024, 1, 1, tzinfo=UTC)
+            end = datetime(2024, 1, 1, 2, tzinfo=UTC)  # 2 hours
 
             mock_function = Mock(return_value=[])
 
-            result = collector._loop_data_collection(
+            _result = collector._loop_data_collection(
                 function=mock_function,
-                ccxt_symbol='BTC/USDT',
-                timeframe='1h',
+                ccxt_symbol="BTC/USDT",
+                timeframe="1h",
                 limit=1000,
                 start_time=start,
                 end_time=end,
                 params=None,
-                logger=None
+                logger=None,
             )
 
             # Should be called at least once
@@ -780,25 +831,28 @@ class TestErrorHandling:
             end = datetime(2024, 1, 2)
 
             with pytest.raises(ValueError, match="not in UTC timezone"):
-                collector.load_data_period('BTC-USDT', '1h', 'ohlcv_spot', start, end)
+                collector.load_data_period("BTC-USDT", "1h", "ohlcv_spot", start, end)
 
     def test_handles_empty_dataframe_gracefully(self):
         """Test handling of empty dataframes."""
         with tempfile.TemporaryDirectory() as tmpdir:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
-            start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+            start = datetime(2024, 1, 1, tzinfo=UTC)
+            end = datetime(2024, 1, 2, tzinfo=UTC)
 
             # Create empty cached data
-            empty_data = pd.DataFrame(columns=['timestamp', 'open', 'close'])
-            cache_file = collector.data_dir / "spot_BTC_USDT_ohlcv_1h_20240101_000000_20240102_000000.parquet"
+            empty_data = pd.DataFrame(columns=["timestamp", "open", "close"])
+            cache_file = (
+                collector.data_dir
+                / "spot_BTC_USDT_ohlcv_1h_20240101_000000_20240102_000000.parquet"
+            )
             empty_data.to_parquet(cache_file)
 
-            with patch.object(collector, 'collect_spot_ohlcv') as mock_collect:
-                mock_collect.return_value = pd.DataFrame(columns=['timestamp', 'open', 'close'])
+            with patch.object(collector, "collect_spot_ohlcv") as mock_collect:
+                mock_collect.return_value = pd.DataFrame(columns=["timestamp", "open", "close"])
 
-                result = collector.load_data_period('BTC-USDT', '1h', 'ohlcv_spot', start, end)
+                result = collector.load_data_period("BTC-USDT", "1h", "ohlcv_spot", start, end)
 
                 # Should handle empty data gracefully
                 assert result is not None
@@ -809,23 +863,28 @@ class TestErrorHandling:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
             # Use non-aligned times
-            start = datetime(2024, 1, 1, 0, 37, 15, tzinfo=timezone.utc)  # 37 minutes, 15 seconds
-            end = datetime(2024, 1, 2, 0, 42, 30, tzinfo=timezone.utc)  # 42 minutes, 30 seconds
+            start = datetime(2024, 1, 1, 0, 37, 15, tzinfo=UTC)  # 37 minutes, 15 seconds
+            end = datetime(2024, 1, 2, 0, 42, 30, tzinfo=UTC)  # 42 minutes, 30 seconds
 
-            test_data = pd.DataFrame({
-                'timestamp': pd.date_range(
-                    datetime(2024, 1, 1, tzinfo=timezone.utc),
-                    datetime(2024, 1, 2, tzinfo=timezone.utc),
-                    freq='1h',
-                    tz='UTC'
-                ),
-                'open': [100.0] * 25,
-                'close': [102.0] * 25
-            })
-            cache_file = collector.data_dir / "spot_BTC_USDT_ohlcv_1h_20240101_000000_20240102_000000.parquet"
+            test_data = pd.DataFrame(
+                {
+                    "timestamp": pd.date_range(
+                        datetime(2024, 1, 1, tzinfo=UTC),
+                        datetime(2024, 1, 2, tzinfo=UTC),
+                        freq="1h",
+                        tz="UTC",
+                    ),
+                    "open": [100.0] * 25,
+                    "close": [102.0] * 25,
+                }
+            )
+            cache_file = (
+                collector.data_dir
+                / "spot_BTC_USDT_ohlcv_1h_20240101_000000_20240102_000000.parquet"
+            )
             test_data.to_parquet(cache_file)
 
-            result = collector.load_data_period('BTC-USDT', '1h', 'ohlcv_spot', start, end)
+            result = collector.load_data_period("BTC-USDT", "1h", "ohlcv_spot", start, end)
 
             # Should still work with aligned boundaries
             assert result is not None
@@ -834,28 +893,32 @@ class TestErrorHandling:
 class TestIntegration:
     """Integration tests that test multiple components together."""
 
-    @patch('crypto_backtester_binance.hist_data.HistoricalDataCollector._loop_data_collection')
+    @patch("crypto_backtester_binance.hist_data.HistoricalDataCollector._loop_data_collection")
     def test_full_workflow_with_caching(self, mock_loop):
         """Test complete workflow: collect, cache, and retrieve data."""
         with tempfile.TemporaryDirectory() as tmpdir:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
-            start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+            start = datetime(2024, 1, 1, tzinfo=UTC)
+            end = datetime(2024, 1, 2, tzinfo=UTC)
 
             # First call - should collect from API
-            mock_data = [[int(ts.timestamp() * 1000), 100.0, 105.0, 95.0, 102.0, 1000.0]
-                        for ts in pd.date_range(start, end, freq='1h')]
+            mock_data = [
+                [int(ts.timestamp() * 1000), 100.0, 105.0, 95.0, 102.0, 1000.0]
+                for ts in pd.date_range(start, end, freq="1h")
+            ]
             mock_loop.return_value = mock_data
 
-            result1 = collector.load_data_period('BTC-USDT', '1h', 'ohlcv_spot', start, end, export=True)
+            result1 = collector.load_data_period(
+                "BTC-USDT", "1h", "ohlcv_spot", start, end, export=True
+            )
 
             assert result1 is not None
             assert len(result1) > 0
 
             # Second call - should use cache
             mock_loop.reset_mock()
-            result2 = collector.load_data_period('BTC-USDT', '1h', 'ohlcv_spot', start, end)
+            result2 = collector.load_data_period("BTC-USDT", "1h", "ohlcv_spot", start, end)
 
             assert result2 is not None
             # Should not call API again
@@ -869,25 +932,23 @@ class TestIntegration:
         with tempfile.TemporaryDirectory() as tmpdir:
             collector = HistoricalDataCollector(data_dir=tmpdir)
 
-            start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-            end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+            start = datetime(2024, 1, 1, tzinfo=UTC)
+            end = datetime(2024, 1, 2, tzinfo=UTC)
 
             # Store data for two symbols
-            btc_data = pd.DataFrame({
-                'timestamp': pd.date_range(start, end, freq='1h', tz='UTC'),
-                'open': [100.0] * 25
-            })
+            btc_data = pd.DataFrame(
+                {"timestamp": pd.date_range(start, end, freq="1h", tz="UTC"), "open": [100.0] * 25}
+            )
 
-            eth_data = pd.DataFrame({
-                'timestamp': pd.date_range(start, end, freq='1h', tz='UTC'),
-                'open': [200.0] * 25
-            })
+            eth_data = pd.DataFrame(
+                {"timestamp": pd.date_range(start, end, freq="1h", tz="UTC"), "open": [200.0] * 25}
+            )
 
-            collector.spot_ohlcv_data['BTC-USDT'] = btc_data
-            collector.spot_ohlcv_data['ETH-USDT'] = eth_data
+            collector.spot_ohlcv_data["BTC-USDT"] = btc_data
+            collector.spot_ohlcv_data["ETH-USDT"] = eth_data
 
             # Verify independent storage
-            assert 'BTC-USDT' in collector.spot_ohlcv_data
-            assert 'ETH-USDT' in collector.spot_ohlcv_data
-            assert collector.spot_ohlcv_data['BTC-USDT']['open'].iloc[0] == 100.0
-            assert collector.spot_ohlcv_data['ETH-USDT']['open'].iloc[0] == 200.0
+            assert "BTC-USDT" in collector.spot_ohlcv_data
+            assert "ETH-USDT" in collector.spot_ohlcv_data
+            assert collector.spot_ohlcv_data["BTC-USDT"]["open"].iloc[0] == 100.0
+            assert collector.spot_ohlcv_data["ETH-USDT"]["open"].iloc[0] == 200.0
