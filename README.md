@@ -1,5 +1,7 @@
 # Crypto Backtester
 
+[![PyPI version](https://badge.fury.io/py/crypto-backtester-binance.svg)](https://badge.fury.io/py/crypto-backtester-binance)
+[![PyPI - Downloads](https://img.shields.io/pypi/dm/crypto-backtester-binance)](https://pypi.org/project/crypto-backtester-binance/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://github.com/LevRoz630/crypto-backtester-binance/workflows/Tests/badge.svg)](https://github.com/LevRoz630/crypto-backtester-binance/actions)
@@ -24,92 +26,87 @@ A backtesting framework for cryptocurrency trading strategies on Binance. Suppor
 
 ## Installation
 
-### 1. Clone the Repository
+### From PyPI (recommended)
 
 ```bash
-git clone <repository-url>
-cd crypto-backtester-binance
+pip install crypto-backtester-binance
 ```
 
-### 2. Install Dependencies
+### From Source
 
-Using pip:
 ```bash
+git clone https://github.com/LevRoz630/crypto-backtester-binance.git
+cd crypto-backtester-binance
 pip install -e .
 ```
 
-Or with documentation dependencies:
+With development dependencies:
 ```bash
-pip install -e ".[docs]"
+pip install -e ".[dev,test,docs]"
 ```
 
-Using uv (recommended):
-```bash
-uv pip install -e .
-```
+### Data Directory
 
-### 3. Set Up Data Directory
-
-Create a directory for storing historical data:
-
-```bash
-mkdir historical_data
-```
-
-The framework will automatically download and cache data in this directory. You can also specify a custom path when initializing the `Backtester`.
+The framework will automatically download and cache historical data. You can specify a custom path when initializing the `Backtester`, or it defaults to `./historical_data`.
 
 ## Project Structure
 
 ```
 crypto-backtester-binance/
-├── src/                    # Core engine modules
-│   ├── backtester.py       # Main backtest orchestrator
-│   ├── oms_simulation.py   # Order management system
-│   ├── hist_data.py        # Historical data collector
-│   ├── position_manager.py # Risk management & position sizing
-│   └── utils.py            # Utility functions
-├── backtest/
-│   ├── strategies/         # Strategy implementations
-│   ├── position_managers/  # Custom position managers
-│   └── example/            # Example scripts
-├── docs/                   # Documentation
-│   └── api/                # API reference
-└── historical_data/        # Cached historical data (created on first run)
+├── src/crypto_backtester_binance/  # Core library
+│   ├── backtester.py               # Main backtest orchestrator
+│   ├── oms_simulation.py           # Order management system
+│   ├── hist_data.py                # Historical data collector
+│   ├── position_manager.py         # Risk management & position sizing
+│   └── utils.py                    # Utility functions
+├── examples/                       # Example scripts
+│   ├── 01_simple_backtest.py       # Buy-and-hold strategy
+│   ├── 02_momentum_strategy.py     # SMA crossover strategy
+│   └── 03_long_short_strategy.py   # Long BTC / Short Alts
+├── tests/                          # Test suite
+├── docs/                           # Documentation
+└── historical_data/                # Cached data (created on first run)
 ```
 
 ## Quick Start
 
 ### Running Your First Backtest
 
-1. **Create a simple script** (`my_backtest.py`):
-
 ```python
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-import sys
+from datetime import datetime, timedelta, UTC
 
-# Add src to path
-sys.path.append(str(Path(__file__).parent / "src"))
+from crypto_backtester_binance.backtester import Backtester
+from crypto_backtester_binance.hist_data import HistoricalDataCollector
+from crypto_backtester_binance.oms_simulation import OMSClient
+from crypto_backtester_binance.position_manager import PositionManager
 
-from backtester import Backtester
-from position_manager import PositionManager
-from backtest.example.v1_hold import HoldStrategy
+
+# Define a simple strategy
+class HoldStrategy:
+    def __init__(self, symbols: list[str], lookback_days: int = 0):
+        self.symbols = symbols
+        self.lookback_days = lookback_days
+        self.has_bought = False
+
+    def run_strategy(self, oms_client: OMSClient, data_manager: HistoricalDataCollector):
+        orders = []
+        if not self.has_bought:
+            for symbol in self.symbols:
+                orders.append({"symbol": symbol, "instrument_type": "future", "side": "LONG"})
+            self.has_bought = True
+        return orders
+
 
 # Initialize backtester
 backtester = Backtester(historical_data_dir="./historical_data")
 
-# Create strategy
-strategy = HoldStrategy(
-    symbols=["BTC-USDT", "ETH-USDT", "SOL-USDT"],
-    lookback_days=0
-)
-
-# Create position manager
+# Create strategy and position manager
+strategy = HoldStrategy(symbols=["BTC-USDT", "ETH-USDT", "SOL-USDT"])
 position_manager = PositionManager()
 
 # Set backtest period
-start_date = datetime.now(timezone.utc) - timedelta(days=50)
-end_date = datetime.now(timezone.utc) - timedelta(days=1)
+start_date = datetime.now(UTC) - timedelta(days=50)
+end_date = datetime.now(UTC) - timedelta(days=1)
 
 # Run backtest
 results = backtester.run_backtest(
@@ -126,34 +123,24 @@ print(f"Total Return: {results['total_return']:.2%}")
 print(f"Sharpe Ratio: {results['sharpe_ratio']:.2f}")
 print(f"Max Drawdown: {results['max_drawdown']:.2%}")
 
-# Plot positions
+# Generate plots
+backtester.plot_portfolio_value()
 backtester.plot_positions(results)
-
-# Save results
-backtester.save_results(results, "my_backtest")
-```
-
-2. **Run the script**:
-
-```bash
-python my_backtest.py
 ```
 
 The first run will download historical data automatically. Subsequent runs use cached data.
 
 ### Running Example Scripts
 
-The repository includes example scripts in `backtest/example/`:
-
 ```bash
-# Run hold strategy example
-python backtest/example/example.py
+# Simple buy-and-hold
+python examples/01_simple_backtest.py
 
-# Run pairs trading strategy
-python backtest/v1_pairs_bt.py
+# Momentum strategy (SMA crossover)
+python examples/02_momentum_strategy.py
 
-# Run long-short strategy
-python backtest/v1_ls_bt.py
+# Long BTC / Short Alts
+python examples/03_long_short_strategy.py
 ```
 
 ## Creating Custom Strategies
@@ -161,57 +148,52 @@ python backtest/v1_ls_bt.py
 A strategy must implement the `run_strategy` method that returns a list of order dictionaries:
 
 ```python
-from typing import List, Dict, Any
-from oms_simulation import OMSClient
-from hist_data import HistoricalDataCollector
+from datetime import timedelta
+
+from crypto_backtester_binance.hist_data import HistoricalDataCollector
+from crypto_backtester_binance.oms_simulation import OMSClient
+
 
 class MyStrategy:
-    def __init__(self, symbols: List[str], lookback_days: int):
+    def __init__(self, symbols: list[str], lookback_days: int):
         self.symbols = symbols
         self.lookback_days = lookback_days
-        self.oms_client = None
-        self.data_manager = None
-    
+
     def run_strategy(
-        self, 
-        oms_client: OMSClient, 
-        data_manager: HistoricalDataCollector
-    ) -> List[Dict[str, Any]]:
+        self,
+        oms_client: OMSClient,
+        data_manager: HistoricalDataCollector,
+    ) -> list[dict]:
         """
         Generate trading orders based on strategy logic.
-        
+
         Returns:
             List of order dictionaries with keys:
             - symbol: str (e.g., "BTC-USDT")
             - instrument_type: str ("spot" or "future")
             - side: str ("LONG", "SHORT", or "CLOSE")
-            - value: float (optional, USDT notional; PositionManager will size if omitted)
+            - value: float (optional, USDT notional)
         """
-        self.oms_client = oms_client
-        self.data_manager = data_manager
-        
         orders = []
-        
-        # Example: Load price data
+
         for symbol in self.symbols:
-            data = self.data_manager.load_data_period(
+            # Load historical data
+            data = data_manager.load_data_period(
                 symbol=symbol,
                 timeframe="1h",
                 data_type="mark_ohlcv_futures",
-                start=self.oms_client.current_time - timedelta(days=self.lookback_days),
-                end=self.oms_client.current_time
+                start_date=oms_client.current_time - timedelta(days=self.lookback_days),
+                end_date=oms_client.current_time,
             )
-            
-            # Your strategy logic here
-            # ...
-            
-            # Add order
+
+            # Your strategy logic here...
+
             orders.append({
                 "symbol": symbol,
                 "instrument_type": "future",
-                "side": "LONG"  # or "SHORT" or "CLOSE"
+                "side": "LONG",  # or "SHORT" or "CLOSE"
             })
-        
+
         return orders
 ```
 
@@ -258,9 +240,9 @@ Then open `http://127.0.0.1:8000` in your browser.
 
 ### Documentation Structure
 
-- **Overview**: Architecture and data flow (`backtest/docs/docs.md`)
+- **Overview**: Architecture and data flow (`docs/overview.md`)
 - **API Reference**: Auto-generated from docstrings (`docs/api/`)
-- **Method Docs**: Detailed method documentation (`backtest/docs/`)
+- **Examples**: Strategy implementations (`examples/`)
 
 ## Permutation Testing
 
@@ -291,12 +273,15 @@ print(f"Observed Sharpe: {results['sharpe_ratio']:.2f}")
 
 ### Import Errors
 
-If you see import errors, ensure `src/` is in your Python path:
+If you see import errors, ensure the package is installed:
 
-```python
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).parent / "src"))
+```bash
+pip install crypto-backtester-binance
+```
+
+Or for development:
+```bash
+pip install -e .
 ```
 
 ### Memory Issues
