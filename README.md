@@ -6,6 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://github.com/LevRoz630/crypto-backtester/workflows/Tests/badge.svg)](https://github.com/LevRoz630/crypto-backtester/actions)
 [![Code Quality](https://github.com/LevRoz630/crypto-backtester/workflows/Code%20Quality/badge.svg)](https://github.com/LevRoz630/crypto-backtester/actions)
+[![codecov](https://codecov.io/gh/LevRoz630/crypto-backtester/branch/main/graph/badge.svg)](https://codecov.io/gh/LevRoz630/crypto-backtester)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 A backtesting framework for cryptocurrency trading strategies on Binance. Supports spot and perpetual futures markets with risk management, position sizing, and performance analytics.
