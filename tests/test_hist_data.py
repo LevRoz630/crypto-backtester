@@ -783,9 +783,11 @@ class TestLoadDataPeriod:
             )
             test_data.to_parquet(cache_file)
 
-            _result = collector.load_data_period(
-                "BTC-USDT", "1h", "ohlcv_spot", start, end, save_to_class=True
-            )
+            # Mock network calls to prevent API access
+            with patch.object(collector, "collect_spot_ohlcv", return_value=test_data):
+                _result = collector.load_data_period(
+                    "BTC-USDT", "1h", "ohlcv_spot", start, end, save_to_class=True
+                )
 
             assert "BTC-USDT" in collector.spot_ohlcv_data
 
