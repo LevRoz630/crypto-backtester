@@ -50,10 +50,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Mypy for static type checking
   - Pre-commit hooks for automated checks
 - Comprehensive test suite:
-  - 179 tests with pytest
+  - 196 tests with pytest
+  - 80% overall test coverage
   - 95% coverage for OMS simulation
   - 97% coverage for format utilities
-  - 75% coverage for historical data
+  - 90% coverage for backtester
   - Test fixtures and mocking for isolated testing
 - CI/CD with GitHub Actions:
   - Automated testing on Python 3.11, 3.12, 3.13

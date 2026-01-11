@@ -159,17 +159,133 @@ class TestRunBacktest:
         assert result is None
 
 
-@pytest.mark.skip(reason="Requires full integration with data manager - complex to mock")
 class TestRunPermutationBacktest:
     """Tests for run_permutation_backtest method."""
 
-    def test_run_permutation_backtest_basic(
-        self, backtester, mock_strategy, mock_position_manager, sample_ohlcv_data
-    ):
-        """Test basic permutation backtest functionality."""
-        # This test requires deep integration mocking
-        # Skip for now, will be covered by integration tests
-        pass
+    @pytest.fixture
+    def permutation_backtester(self, tmp_path):
+        """Create backtester for permutation tests."""
+        data_dir = tmp_path / "test_data"
+        data_dir.mkdir()
+
+        bt = Backtester(historical_data_dir=str(data_dir))
+
+        dates = pd.date_range("2024-01-01", periods=100, freq="1h", tz="UTC")
+        sample_data = pd.DataFrame({
+            "timestamp": dates,
+            "open": np.random.uniform(44000, 46000, 100),
+            "high": np.random.uniform(45000, 47000, 100),
+            "low": np.random.uniform(43000, 45000, 100),
+            "close": np.random.uniform(44000, 46000, 100),
+            "volume": np.random.uniform(100, 1000, 100),
+        })
+
+        # Need to use actual DataFrame.get() method which returns DataFrame or None
+        # Set up data stores with actual data for symbols that will be used
+        bt.data_manager.load_data_period = Mock(return_value=sample_data.copy())
+        bt.data_manager.spot_ohlcv_data = {"BTC": sample_data.copy(), "BTC-USDT": sample_data.copy()}
+        bt.data_manager.perpetual_mark_ohlcv_data = {"BTC": sample_data.copy(), "BTC-USDT": sample_data.copy()}
+        bt.data_manager.perpetual_index_ohlcv_data = {"BTC": sample_data.copy(), "BTC-USDT": sample_data.copy()}
+
+        bt.oms_client.update_portfolio_value = Mock(return_value=10000.0)
+        bt.oms_client.get_position = Mock(return_value=[])
+        bt.oms_client.get_position_summary = Mock(return_value={})
+        bt.oms_client.set_target_position = Mock(return_value={"status": "success"})
+        bt.oms_client.get_current_price = Mock(return_value=45000.0)
+        bt.oms_client.positions = {}
+        bt.oms_client.balance = {"USDT": 10000.0}
+        bt.oms_client.trade_history = []
+        bt.oms_client.current_time = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+
+        def set_time(t):
+            bt.oms_client.current_time = t
+        bt.oms_client.set_current_time = Mock(side_effect=set_time)
+        bt.oms_client.set_data_manager = Mock()
+
+        return bt
+
+    @pytest.fixture
+    def perm_strategy(self):
+        """Strategy for permutation tests."""
+        strategy = Mock()
+        strategy.symbols = ["BTC-USDT-PERP"]
+        strategy.lookback_days = 1
+        strategy.run_strategy = Mock(return_value=[])
+        return strategy
+
+    @pytest.fixture
+    def perm_position_manager(self):
+        """Position manager for permutation tests."""
+        pm = Mock()
+        pm.filter_orders = Mock(return_value=[])
+        return pm
+
+    def test_permutation_backtest_missing_time_step(self, permutation_backtester, perm_strategy, perm_position_manager):
+        """Test permutation backtest requires time_step."""
+        start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+        end_date = datetime(2024, 1, 2, tzinfo=pd.Timestamp.now("UTC").tz)
+
+        with pytest.raises(ValueError, match="Time step is required"):
+            permutation_backtester.run_permutation_backtest(
+                strategy=perm_strategy,
+                position_manager=perm_position_manager,
+                start_date=start_date,
+                end_date=end_date,
+                time_step=None,
+                market_type="futures",
+                permutations=2,
+            )
+
+    def test_permutation_backtest_spot(self, permutation_backtester, perm_strategy, perm_position_manager):
+        """Test permutation backtest with spot market."""
+        perm_strategy.symbols = ["BTC-USDT"]
+        start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+        end_date = datetime(2024, 1, 1, 2, tzinfo=pd.Timestamp.now("UTC").tz)
+
+        result = permutation_backtester.run_permutation_backtest(
+            strategy=perm_strategy,
+            position_manager=perm_position_manager,
+            start_date=start_date,
+            end_date=end_date,
+            time_step=timedelta(hours=1),
+            market_type="spot",
+            permutations=2,
+        )
+
+        assert result is not None
+
+    def test_permutation_backtest_futures(self, permutation_backtester, perm_strategy, perm_position_manager):
+        """Test permutation backtest with futures market."""
+        start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+        end_date = datetime(2024, 1, 1, 2, tzinfo=pd.Timestamp.now("UTC").tz)
+
+        result = permutation_backtester.run_permutation_backtest(
+            strategy=perm_strategy,
+            position_manager=perm_position_manager,
+            start_date=start_date,
+            end_date=end_date,
+            time_step=timedelta(hours=1),
+            market_type="futures",
+            permutations=2,
+        )
+
+        assert result is not None
+
+    def test_permutation_backtest_invalid_market(self, permutation_backtester, perm_strategy, perm_position_manager):
+        """Test permutation backtest with invalid market type."""
+        start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+        end_date = datetime(2024, 1, 1, 2, tzinfo=pd.Timestamp.now("UTC").tz)
+
+        with pytest.raises(ValueError, match="Invalid market type"):
+            permutation_backtester.run_permutation_backtest(
+                strategy=perm_strategy,
+                position_manager=perm_position_manager,
+                start_date=start_date,
+                end_date=end_date,
+                time_step=timedelta(hours=1),
+                market_type="invalid",
+                permutations=2,
+            )
 
 
 class TestCalculatePerformanceMetrics:
@@ -389,3 +505,431 @@ class TestEdgeCases:
         # Should handle extreme values
         assert not np.isinf(backtester.sharpe_ratio)
         assert backtester.max_drawdown > 0  # Stored as absolute value
+
+
+class TestRunBacktestIntegration:
+    """Integration tests for run_backtest method with mocked dependencies."""
+
+    @pytest.fixture
+    def integrated_backtester(self, tmp_path):
+        """Create backtester with properly mocked dependencies."""
+        data_dir = tmp_path / "test_data"
+        data_dir.mkdir()
+
+        bt = Backtester(historical_data_dir=str(data_dir))
+
+        # Create sample data
+        dates = pd.date_range("2024-01-01", periods=50, freq="1h", tz="UTC")
+        sample_data = pd.DataFrame({
+            "timestamp": dates,
+            "open": [45000.0] * 50,
+            "high": [45100.0] * 50,
+            "low": [44900.0] * 50,
+            "close": [45000.0] * 50,
+            "volume": [100.0] * 50,
+        })
+
+        # Mock data manager methods
+        bt.data_manager.load_data_period = Mock(return_value=sample_data)
+        bt.data_manager.spot_ohlcv_data = {"BTC": sample_data}
+        bt.data_manager.perpetual_mark_ohlcv_data = {"BTC": sample_data}
+        bt.data_manager.perpetual_index_ohlcv_data = {"BTC": sample_data}
+
+        # Mock OMS client
+        bt.oms_client.update_portfolio_value = Mock(return_value=10000.0)
+        bt.oms_client.get_position = Mock(return_value=[])
+        bt.oms_client.get_position_summary = Mock(return_value={})
+        bt.oms_client.set_target_position = Mock(return_value={"status": "success"})
+        bt.oms_client.get_current_price = Mock(return_value=45000.0)
+        bt.oms_client.positions = {}
+        bt.oms_client.current_time = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+
+        def set_time(t):
+            bt.oms_client.current_time = t
+        bt.oms_client.set_current_time = Mock(side_effect=set_time)
+        bt.oms_client.set_data_manager = Mock()
+
+        return bt
+
+    @pytest.fixture
+    def simple_strategy(self):
+        """Create a simple strategy for testing."""
+        strategy = Mock()
+        strategy.symbols = ["BTC-USDT-PERP"]
+        strategy.lookback_days = 1
+        strategy.run_strategy = Mock(return_value=[
+            {"symbol": "BTC-USDT-PERP", "instrument_type": "future", "side": "LONG", "value": 1000.0}
+        ])
+        return strategy
+
+    @pytest.fixture
+    def simple_position_manager(self):
+        """Create a simple position manager for testing."""
+        pm = Mock()
+        pm.filter_orders = Mock(side_effect=lambda orders, **kwargs: orders)
+        return pm
+
+    def test_run_backtest_spot_market(self, integrated_backtester, simple_strategy, simple_position_manager):
+        """Test run_backtest with spot market."""
+        simple_strategy.symbols = ["BTC-USDT"]
+        simple_strategy.run_strategy = Mock(return_value=[
+            {"symbol": "BTC-USDT", "instrument_type": "spot", "side": "LONG", "value": 1000.0}
+        ])
+
+        start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+        end_date = datetime(2024, 1, 1, 2, tzinfo=pd.Timestamp.now("UTC").tz)
+
+        result = integrated_backtester.run_backtest(
+            strategy=simple_strategy,
+            position_manager=simple_position_manager,
+            start_date=start_date,
+            end_date=end_date,
+            time_step=timedelta(hours=1),
+            market_type="spot",
+        )
+
+        assert result is not None
+        assert "final_balance" in result or result.get("portfolio_values") is not None
+
+    def test_run_backtest_futures_market(self, integrated_backtester, simple_strategy, simple_position_manager):
+        """Test run_backtest with futures market."""
+        start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+        end_date = datetime(2024, 1, 1, 2, tzinfo=pd.Timestamp.now("UTC").tz)
+
+        result = integrated_backtester.run_backtest(
+            strategy=simple_strategy,
+            position_manager=simple_position_manager,
+            start_date=start_date,
+            end_date=end_date,
+            time_step=timedelta(hours=1),
+            market_type="futures",
+        )
+
+        assert result is not None
+
+    def test_run_backtest_invalid_market_type(self, integrated_backtester, simple_strategy, simple_position_manager):
+        """Test run_backtest with invalid market type."""
+        start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+        end_date = datetime(2024, 1, 1, 2, tzinfo=pd.Timestamp.now("UTC").tz)
+
+        # Invalid market type should log error and continue
+        result = integrated_backtester.run_backtest(
+            strategy=simple_strategy,
+            position_manager=simple_position_manager,
+            start_date=start_date,
+            end_date=end_date,
+            time_step=timedelta(hours=1),
+            market_type="invalid",
+        )
+
+        # Should still return something (might be None due to no data)
+        # The key is it doesn't crash
+
+    def test_run_backtest_strategy_orders_executed(self, integrated_backtester, simple_strategy, simple_position_manager):
+        """Test that strategy orders are executed."""
+        start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+        end_date = datetime(2024, 1, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+
+        integrated_backtester.run_backtest(
+            strategy=simple_strategy,
+            position_manager=simple_position_manager,
+            start_date=start_date,
+            end_date=end_date,
+            time_step=timedelta(hours=1),
+            market_type="futures",
+        )
+
+        # Strategy should have been called
+        assert simple_strategy.run_strategy.called
+        # Position manager should have filtered orders
+        assert simple_position_manager.filter_orders.called
+
+    def test_run_backtest_with_none_orders(self, integrated_backtester, simple_strategy, simple_position_manager):
+        """Test run_backtest when strategy returns no orders."""
+        simple_strategy.run_strategy = Mock(return_value=None)
+        simple_position_manager.filter_orders = Mock(return_value=None)
+
+        start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+        end_date = datetime(2024, 1, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+
+        result = integrated_backtester.run_backtest(
+            strategy=simple_strategy,
+            position_manager=simple_position_manager,
+            start_date=start_date,
+            end_date=end_date,
+            time_step=timedelta(hours=1),
+            market_type="futures",
+        )
+
+        # Should complete without errors
+        assert result is not None
+
+    def test_run_backtest_position_exposure_tracking(self, integrated_backtester, simple_strategy, simple_position_manager):
+        """Test that position exposures are tracked."""
+        # Setup position for exposure tracking
+        integrated_backtester.oms_client.positions = {
+            "BTC-USDT-PERP": {"quantity": 0.1, "instrument_type": "future"}
+        }
+
+        start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+        end_date = datetime(2024, 1, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+
+        integrated_backtester.run_backtest(
+            strategy=simple_strategy,
+            position_manager=simple_position_manager,
+            start_date=start_date,
+            end_date=end_date,
+            time_step=timedelta(hours=1),
+            market_type="futures",
+        )
+
+        # Position exposures should be tracked
+        assert len(integrated_backtester.position_exposures_history) > 0
+
+    def test_run_backtest_order_execution_error_handling(self, integrated_backtester, simple_strategy, simple_position_manager):
+        """Test that order execution errors are handled gracefully."""
+        integrated_backtester.oms_client.set_target_position = Mock(side_effect=Exception("Order failed"))
+
+        start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+        end_date = datetime(2024, 1, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+
+        # Should not raise exception
+        result = integrated_backtester.run_backtest(
+            strategy=simple_strategy,
+            position_manager=simple_position_manager,
+            start_date=start_date,
+            end_date=end_date,
+            time_step=timedelta(hours=1),
+            market_type="futures",
+        )
+
+        assert result is not None
+
+
+class TestBacktestResults:
+    """Tests for backtest result generation."""
+
+    @pytest.fixture
+    def backtester_with_results(self, tmp_path):
+        """Create backtester with simulated results."""
+        data_dir = tmp_path / "test_data"
+        data_dir.mkdir()
+
+        bt = Backtester(historical_data_dir=str(data_dir))
+        bt.portfolio_values = [10000, 10100, 10200, 10300, 10400]
+        bt.returns = [0.01, 0.01, 0.01, 0.01]
+        bt.drawdowns = [0, 0, 0, 0, 0]
+        bt.trade_history = [{"symbol": "BTC", "side": "LONG"}]
+        bt.final_balance = 10400
+        bt.oms_client.balance = {"USDT": 10400}
+        bt.oms_client.positions = {}
+        bt.oms_client.trade_history = bt.trade_history
+
+        return bt
+
+    def test_trade_history_accessible(self, backtester_with_results):
+        """Test trade history is accessible via oms_client."""
+        assert backtester_with_results.oms_client.trade_history == backtester_with_results.trade_history
+
+    def test_final_balance_accessible(self, backtester_with_results):
+        """Test final balance is set correctly."""
+        assert backtester_with_results.final_balance == 10400
+
+
+class TestBacktestEdgeCases:
+    """Additional edge case tests for better coverage."""
+
+    @pytest.fixture
+    def edge_backtester(self, tmp_path):
+        """Create backtester for edge case tests."""
+        data_dir = tmp_path / "test_data"
+        data_dir.mkdir()
+        bt = Backtester(historical_data_dir=str(data_dir))
+
+        dates = pd.date_range("2024-01-01", periods=50, freq="1h", tz="UTC")
+        sample_data = pd.DataFrame({
+            "timestamp": dates,
+            "open": [45000.0] * 50,
+            "high": [45100.0] * 50,
+            "low": [44900.0] * 50,
+            "close": [45000.0] * 50,
+            "volume": [100.0] * 50,
+        })
+
+        bt.data_manager.load_data_period = Mock(return_value=sample_data)
+        bt.data_manager.spot_ohlcv_data = {"BTC": sample_data}
+        bt.data_manager.perpetual_mark_ohlcv_data = {"BTC": sample_data}
+        bt.data_manager.perpetual_index_ohlcv_data = {"BTC": sample_data}
+
+        bt.oms_client.update_portfolio_value = Mock(return_value=10000.0)
+        bt.oms_client.get_position = Mock(return_value=[])
+        bt.oms_client.get_position_summary = Mock(return_value={})
+        bt.oms_client.set_target_position = Mock(return_value={"status": "success"})
+        bt.oms_client.get_current_price = Mock(return_value=45000.0)
+        bt.oms_client.positions = {}
+        bt.oms_client.balance = {"USDT": 10000.0}
+        bt.oms_client.trade_history = []
+        bt.oms_client.current_time = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+
+        def set_time(t):
+            bt.oms_client.current_time = t
+        bt.oms_client.set_current_time = Mock(side_effect=set_time)
+        bt.oms_client.set_data_manager = Mock()
+
+        return bt
+
+    @pytest.fixture
+    def edge_strategy(self):
+        """Strategy for edge case tests."""
+        strategy = Mock()
+        strategy.symbols = ["BTC-USDT-PERP"]
+        strategy.lookback_days = 1
+        strategy.run_strategy = Mock(return_value=[])
+        return strategy
+
+    @pytest.fixture
+    def edge_pm(self):
+        """Position manager for edge case tests."""
+        pm = Mock()
+        pm.filter_orders = Mock(return_value=[])
+        return pm
+
+    @patch("crypto_backtester_binance.backtester.format_positions_table")
+    def test_backtest_with_positions_error(self, mock_format, edge_backtester, edge_strategy, edge_pm):
+        """Test backtest handles position formatting errors gracefully."""
+        mock_format.side_effect = Exception("Format error")
+
+        start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+        end_date = datetime(2024, 1, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+
+        result = edge_backtester.run_backtest(
+            strategy=edge_strategy,
+            position_manager=edge_pm,
+            start_date=start_date,
+            end_date=end_date,
+            time_step=timedelta(hours=1),
+            market_type="futures",
+        )
+
+        # Should still complete (falls back to get_position_summary)
+        assert result is not None
+
+    def test_backtest_with_exposure_error(self, edge_backtester, edge_strategy, edge_pm):
+        """Test backtest handles exposure snapshot errors gracefully."""
+        edge_backtester.oms_client.positions = {"BTC-USDT-PERP": {"quantity": 0.1}}
+        edge_backtester.oms_client.get_current_price = Mock(return_value=None)
+
+        start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+        end_date = datetime(2024, 1, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+
+        result = edge_backtester.run_backtest(
+            strategy=edge_strategy,
+            position_manager=edge_pm,
+            start_date=start_date,
+            end_date=end_date,
+            time_step=timedelta(hours=1),
+            market_type="futures",
+        )
+
+        assert result is not None
+
+    def test_backtest_iteration_error_recovery(self, edge_backtester, edge_strategy, edge_pm):
+        """Test backtest recovers from iteration errors."""
+        call_count = [0]
+        def failing_update():
+            call_count[0] += 1
+            if call_count[0] == 1:
+                raise Exception("Iteration error")
+            return 10000.0
+
+        edge_backtester.oms_client.update_portfolio_value = Mock(side_effect=failing_update)
+
+        start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+        end_date = datetime(2024, 1, 1, 2, tzinfo=pd.Timestamp.now("UTC").tz)
+
+        result = edge_backtester.run_backtest(
+            strategy=edge_strategy,
+            position_manager=edge_pm,
+            start_date=start_date,
+            end_date=end_date,
+            time_step=timedelta(hours=1),
+            market_type="futures",
+        )
+
+        assert result is not None
+
+
+class TestDataAlignment:
+    """Tests for data alignment in backtester."""
+
+    @pytest.fixture
+    def alignment_backtester(self, tmp_path):
+        """Create backtester for alignment tests."""
+        data_dir = tmp_path / "test_data"
+        data_dir.mkdir()
+        bt = Backtester(historical_data_dir=str(data_dir))
+
+        # Create data with naive timestamps (no timezone)
+        dates_naive = pd.date_range("2024-01-01", periods=50, freq="1h")
+        sample_data_naive = pd.DataFrame({
+            "timestamp": dates_naive,
+            "open": [45000.0] * 50,
+            "high": [45100.0] * 50,
+            "low": [44900.0] * 50,
+            "close": [45000.0] * 50,
+            "volume": [100.0] * 50,
+        })
+
+        bt.data_manager.load_data_period = Mock(return_value=sample_data_naive)
+        bt.data_manager.spot_ohlcv_data = {"BTC": sample_data_naive}
+        bt.data_manager.perpetual_mark_ohlcv_data = {"BTC": sample_data_naive}
+        bt.data_manager.perpetual_index_ohlcv_data = {"BTC": sample_data_naive}
+
+        bt.oms_client.update_portfolio_value = Mock(return_value=10000.0)
+        bt.oms_client.get_position = Mock(return_value=[])
+        bt.oms_client.get_position_summary = Mock(return_value={})
+        bt.oms_client.set_target_position = Mock(return_value={"status": "success"})
+        bt.oms_client.get_current_price = Mock(return_value=45000.0)
+        bt.oms_client.positions = {}
+        bt.oms_client.balance = {"USDT": 10000.0}
+        bt.oms_client.trade_history = []
+        bt.oms_client.current_time = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+
+        def set_time(t):
+            bt.oms_client.current_time = t
+        bt.oms_client.set_current_time = Mock(side_effect=set_time)
+        bt.oms_client.set_data_manager = Mock()
+
+        return bt
+
+    @pytest.fixture
+    def alignment_strategy(self):
+        """Strategy for alignment tests."""
+        strategy = Mock()
+        strategy.symbols = ["BTC-USDT-PERP"]
+        strategy.lookback_days = 1
+        strategy.run_strategy = Mock(return_value=[])
+        return strategy
+
+    @pytest.fixture
+    def alignment_pm(self):
+        """Position manager for alignment tests."""
+        pm = Mock()
+        pm.filter_orders = Mock(return_value=[])
+        return pm
+
+    def test_timezone_naive_data_alignment(self, alignment_backtester, alignment_strategy, alignment_pm):
+        """Test backtest handles timezone-naive data correctly."""
+        start_date = datetime(2024, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+        end_date = datetime(2024, 1, 1, 1, tzinfo=pd.Timestamp.now("UTC").tz)
+
+        result = alignment_backtester.run_backtest(
+            strategy=alignment_strategy,
+            position_manager=alignment_pm,
+            start_date=start_date,
+            end_date=end_date,
+            time_step=timedelta(hours=1),
+            market_type="futures",
+        )
+
+        assert result is not None
